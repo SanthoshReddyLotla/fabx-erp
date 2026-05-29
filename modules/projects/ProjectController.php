@@ -22,7 +22,7 @@ class ProjectController extends Controller {
         $status = input('status');
         $stage = input('stage');
         
-        $where = "WHERE p.is_deleted = 0"; $params = [];
+        $where = "WHERE 1=1"; $params = [];
         if ($status) { $where .= " AND p.status = ?"; $params[] = $status; }
         if ($stage) { $where .= " AND p.current_stage = ?"; $params[] = $stage; }
         
