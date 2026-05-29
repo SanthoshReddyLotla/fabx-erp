@@ -12,7 +12,7 @@ if (!defined('FABX_ROOT')) {
 // Application Settings
 define('APP_NAME', 'FabX Engineering ERP');
 define('APP_VERSION', '1.0.0');
-define('APP_URL', 'https://papayawhip-goshawk-993221.hostingersite.com/fabx-erp');
+define('APP_URL', 'https://papayawhip-goshawk-993221.hostingersite.com');
 define('APP_ENV', 'development'); // development | production
 
 // Company Info

@@ -4,7 +4,7 @@ Options -Indexes
 Options +FollowSymLinks
 
 RewriteEngine On
-RewriteBase /fabx-erp/
+# RewriteBase /fabx-erp/
 
 # Redirect to HTTPS (uncomment in production)
 # RewriteCond %{HTTPS} off

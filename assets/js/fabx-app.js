@@ -11,7 +11,7 @@
         config: {
             sessionTimeout: 30 * 60 * 1000, // 30 minutes
             heartbeatInterval: 5 * 60 * 1000, // 5 minutes
-            apiBase: '/fabx-erp/api/'
+            apiBase: '/api/'
         },
 
         // State
@@ -163,7 +163,7 @@
                         confirmButtonText: 'Login',
                         allowOutsideClick: false
                     }).then(() => {
-                        window.location.href = '/fabx-erp/auth/login?timeout=1';
+                        window.location.href = '/auth/login?timeout=1';
                     });
                     return;
                 }

@@ -20,7 +20,7 @@ set_security_headers();
 
 // Simple routing system
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$basePath = parse_url(APP_URL, PHP_URL_PATH) ?? '/fabx-erp';
+$basePath = parse_url(APP_URL, PHP_URL_PATH) ?? '';
 $uri = substr($uri, strlen($basePath));
 $uri = trim($uri, '/');
 
@@ -46,11 +46,11 @@ $routes = [
     'auth/toggle-sidebar' => ['module' => 'auth', 'controller' => 'AuthController', 'action' => 'toggleSidebar', 'auth' => true],
     'auth/profile' => ['module' => 'auth', 'controller' => 'AuthController', 'action' => 'profile', 'auth' => true],
     'auth/update-profile' => ['module' => 'auth', 'controller' => 'AuthController', 'action' => 'updateProfile', 'auth' => true],
-    
+
     // Dashboard
     'dashboard' => ['module' => 'dashboard', 'controller' => 'DashboardController', 'action' => 'index', 'auth' => true],
     'dashboard/api' => ['module' => 'dashboard', 'controller' => 'DashboardController', 'action' => 'apiData', 'auth' => true],
-    
+
     // QMS Module
     'qms/dashboard' => ['module' => 'qms', 'controller' => 'QMSController', 'action' => 'index', 'auth' => true],
     'qms/documents' => ['module' => 'qms', 'controller' => 'QMSController', 'action' => 'documents', 'auth' => true],
@@ -70,7 +70,7 @@ $routes = [
     'qms/risks' => ['module' => 'qms', 'controller' => 'QMSController', 'action' => 'risks', 'auth' => true],
     'qms/reviews' => ['module' => 'qms', 'controller' => 'QMSController', 'action' => 'reviews', 'auth' => true],
     'qms/kpi' => ['module' => 'qms', 'controller' => 'QMSController', 'action' => 'kpi', 'auth' => true],
-    
+
     // Projects Module
     'projects' => ['module' => 'projects', 'controller' => 'ProjectController', 'action' => 'index', 'auth' => true],
     'projects/create' => ['module' => 'projects', 'controller' => 'ProjectController', 'action' => 'create', 'auth' => true],
@@ -80,7 +80,7 @@ $routes = [
     'projects/work-orders' => ['module' => 'projects', 'controller' => 'ProjectController', 'action' => 'workOrders', 'auth' => true],
     'projects/production' => ['module' => 'projects', 'controller' => 'ProjectController', 'action' => 'production', 'auth' => true],
     'projects/drawings' => ['module' => 'projects', 'controller' => 'ProjectController', 'action' => 'drawings', 'auth' => true],
-    
+
     // CRM Module
     'crm/leads' => ['module' => 'crm', 'controller' => 'CRMController', 'action' => 'leads', 'auth' => true],
     'crm/inquiries' => ['module' => 'crm', 'controller' => 'CRMController', 'action' => 'inquiries', 'auth' => true],
@@ -88,17 +88,17 @@ $routes = [
     'crm/quotations/create' => ['module' => 'crm', 'controller' => 'CRMController', 'action' => 'createQuotation', 'auth' => true],
     'crm/followups' => ['module' => 'crm', 'controller' => 'CRMController', 'action' => 'followups', 'auth' => true],
     'crm/pipeline' => ['module' => 'crm', 'controller' => 'CRMController', 'action' => 'pipeline', 'auth' => true],
-    
+
     // Clients Module
     'clients' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'index', 'auth' => true],
     'clients/create' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'create', 'auth' => true],
     'clients/view' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'show', 'auth' => true],
-    
+
     // Vendors Module
     'vendors' => ['module' => 'vendors', 'controller' => 'VendorController', 'action' => 'index', 'auth' => true],
     'vendors/create' => ['module' => 'vendors', 'controller' => 'VendorController', 'action' => 'create', 'auth' => true],
     'vendors/view' => ['module' => 'vendors', 'controller' => 'VendorController', 'action' => 'show', 'auth' => true],
-    
+
     // Purchase Module
     'purchase/requisitions' => ['module' => 'purchase', 'controller' => 'PurchaseController', 'action' => 'requisitions', 'auth' => true],
     'purchase/requisitions/create' => ['module' => 'purchase', 'controller' => 'PurchaseController', 'action' => 'createRequisition', 'auth' => true],
@@ -107,7 +107,7 @@ $routes = [
     'purchase/grn' => ['module' => 'purchase', 'controller' => 'PurchaseController', 'action' => 'grn', 'auth' => true],
     'purchase/inventory' => ['module' => 'purchase', 'controller' => 'PurchaseController', 'action' => 'inventory', 'auth' => true],
     'purchase/issues' => ['module' => 'purchase', 'controller' => 'PurchaseController', 'action' => 'issues', 'auth' => true],
-    
+
     // Accounts Module
     'accounts/invoices' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'invoices', 'auth' => true],
     'accounts/invoices/create' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'createInvoice', 'auth' => true],
@@ -115,24 +115,24 @@ $routes = [
     'accounts/expenses' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'expenses', 'auth' => true],
     'accounts/vendor-payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'vendorPayments', 'auth' => true],
     'accounts/ledger' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'ledger', 'auth' => true],
-    
+
     // HR Module
     'hr/employees' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'employees', 'auth' => true],
     'hr/attendance' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'attendance', 'auth' => true],
     'hr/leaves' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'leaves', 'auth' => true],
     'hr/training' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'training', 'auth' => true],
     'hr/appraisals' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'appraisals', 'auth' => true],
-    
+
     // Files Module
     'files' => ['module' => 'files', 'controller' => 'FileController', 'action' => 'index', 'auth' => true],
-    
+
     // Reports Module
     'reports/production' => ['module' => 'reports', 'controller' => 'ReportController', 'action' => 'production', 'auth' => true],
     'reports/quality' => ['module' => 'reports', 'controller' => 'ReportController', 'action' => 'quality', 'auth' => true],
     'reports/sales' => ['module' => 'reports', 'controller' => 'ReportController', 'action' => 'sales', 'auth' => true],
     'reports/inventory' => ['module' => 'reports', 'controller' => 'ReportController', 'action' => 'inventory', 'auth' => true],
     'reports/finance' => ['module' => 'reports', 'controller' => 'ReportController', 'action' => 'finance', 'auth' => true],
-    
+
     // Admin Module
     'admin/users' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'users', 'auth' => true],
     'admin/roles' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'roles', 'auth' => true],
@@ -181,11 +181,11 @@ $controllerFile = FABX_ROOT . '/modules/' . $route['module'] . '/' . $route['con
 try {
     if (file_exists($controllerFile)) {
         require_once $controllerFile;
-        
+
         if (class_exists($controllerClass)) {
             $instance = new $controllerClass();
             $action = $route['action'];
-            
+
             if (method_exists($instance, $action)) {
                 // Call action with params
                 if (!empty($params)) {
@@ -229,7 +229,7 @@ try {
     }
 } catch (Exception $e) {
     error_log("FabX ERP Error: " . $e->getMessage());
-    
+
     if (APP_ENV === 'development') {
         echo "<div style='padding:2rem;font-family:sans-serif;'>
             <h2 style='color:#e74c3c'>Error</h2>

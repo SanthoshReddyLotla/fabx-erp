@@ -40,18 +40,18 @@
 ### Step 1: Download and Extract
 
 ```bash
-# Upload the fabx-erp folder to your web server document root
+# Upload the  folder to your web server document root
 # Example for Apache:
-/var/www/html/fabx-erp/
+/var/www/html/
 
 # Or for shared hosting:
-/public_html/fabx-erp/
+/public_html/
 ```
 
 ### Step 2: Set File Permissions
 
 ```bash
-cd /var/www/html/fabx-erp
+cd /var/www/html/
 
 # Set ownership (adjust www-data to your web server user)
 sudo chown -R www-data:www-data .
@@ -88,7 +88,7 @@ EXIT;
 
 ```bash
 # Import the schema
-cd /var/www/html/fabx-erp/database
+cd /var/www/html/database
 mysql -u fabx_user -p fabx_erp < schema.sql
 
 # Import seed data (optional - for demo/testing)
@@ -110,9 +110,9 @@ define('DB_PASS', 'YourStrongPassword123!'); // Your database password
 Update the application URL:
 
 ```php
-define('APP_URL', 'http://your-domain.com/fabx-erp');
+define('APP_URL', 'http://your-domain.com/');
 // OR for local development:
-define('APP_URL', 'http://localhost/fabx-erp');
+define('APP_URL', 'http://localhost/');
 ```
 
 For production, also update:
@@ -134,7 +134,7 @@ sudo systemctl restart apache2
 For Apache virtual host, ensure AllowOverride is set to All:
 
 ```apache
-<Directory /var/www/html/fabx-erp>
+<Directory /var/www/html>
     Options -Indexes +FollowSymLinks
     AllowOverride All
     Require all granted
@@ -148,7 +148,7 @@ The `.htaccess` file is already included in the project root.
 After installation (with seed data):
 
 ```
-URL: http://your-domain.com/fabx-erp/auth/login
+URL: http://your-domain.com/auth/login
 Email: admin@fabxengineering.com
 Password: Admin@123
 
@@ -242,7 +242,7 @@ VALUES ('FABX001', 'System', 'Administrator', 'admin@fabxengineering.com', '9999
 ## Directory Structure
 
 ```
-fabx-erp/
+/
 ├── config/
 │   └── config.php              # Main configuration
 ├── core/
@@ -359,7 +359,7 @@ crontab -e
 
 ```bash
 # Backup uploads directory
-rsync -av /var/www/html/fabx-erp/assets/uploads/ /backup/uploads/
+rsync -av /var/www/html/assets/uploads/ /backup/uploads/
 ```
 
 ### Recovery
@@ -369,7 +369,7 @@ rsync -av /var/www/html/fabx-erp/assets/uploads/ /backup/uploads/
 mysql -u fabx_user -p fabx_erp < backup_file.sql
 
 # Restore files
-cp -r /backup/uploads/* /var/www/html/fabx-erp/assets/uploads/
+cp -r /backup/uploads/* /var/www/html/assets/uploads/
 ```
 
 ---
