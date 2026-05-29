@@ -52,12 +52,13 @@ class QMSController extends Controller {
         
         $where = [];
         $params = [];
-        $sql = "SELECT d.*, dc.name as category_name, CONCAT(u.first_name, ' ', u.last_name) as prepared_by_name 
-                FROM " . $this->db->table("documents") . " d
-                LEFT JOIN " . $this->db->table("doc_categories") . " dc ON d.category_id = dc.id
-                LEFT JOIN " . $this->db->table("users") . " u ON d.prepared_by = u.id
-                WHERE d.is_deleted = 0";
-        
+        // NEW CODE
+$sql = "SELECT d.*, dc.name as category_name, CONCAT(u.first_name, ' ', u.last_name) as prepared_by_name 
+        FROM " . $this->db->table("documents") . " d
+        LEFT JOIN " . $this->db->table("doc_categories") . " dc ON d.category_id = dc.id
+        LEFT JOIN " . $this->db->table("users") . " u ON d.prepared_by = u.id
+        WHERE 1=1"; // Changed d.is_deleted = 0 to 1=1 to allow safe appending of further filters
+
         if ($search) {
             $sql .= " AND (d.title LIKE ? OR d.doc_code LIKE ?)";
             $params[] = "%$search%";
