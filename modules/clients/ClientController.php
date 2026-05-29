@@ -17,7 +17,7 @@ class ClientController extends Controller {
         $this->requireCan('read');
         $page = (int)($_GET['page'] ?? 1);
         $status = input('status');
-        $where = "WHERE is_deleted = 0"; $params = [];
+        $where = "WHERE 1=1"; $params = [];
         if ($status) { $where .= " AND status = ?"; $params[] = $status; }
         
         $clients = $this->db->fetchAll(

@@ -1,39 +1,74 @@
-<?php /** FabX ERP - CRM Inquiries List View */ ?>
+<?php /** FabX ERP - CRM Quotations List View */ ?>
 <div class="page-header">
-    <h1 class="page-title"><i class="bi bi-envelope-open"></i> Inquiries</h1>
+    <h1 class="page-title"><i class="bi bi-file-text text-primary"></i> Quotations</h1>
+    <div class="page-actions">
+        <a href="<?= base_url('crm/quotations/create') ?>" class="btn btn-fx btn-fx-primary">
+            <i class="bi bi-plus-lg"></i> New Quotation
+        </a>
+    </div>
 </div>
 
 <div class="fx-card">
     <div class="fx-card-body p-0">
         <div class="table-responsive-fx">
-            <table class="fx-table mb-0" id="inquiriesTable">
+            <table class="fx-table mb-0" id="quotationsTable">
                 <thead>
                     <tr>
-                        <th>Company</th><th>Contact Person</th><th>Email</th>
-                        <th>Phone</th><th>Source</th><th>Value</th><th>Date</th>
+                        <th>Quotation No</th>
+                        <th>Client Name</th>
+                        <th>Subject</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Created Date</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($inquiries)): ?>
-                        <?php foreach ($inquiries as $inq): ?>
+                    <?php if (!empty($quotations)): ?>
+                        <?php foreach ($quotations as $q): ?>
                             <tr>
-                                <td><strong><?= e($inq['company_name'] ?? '-') ?></strong></td>
-                                <td><?= e($inq['contact_person'] ?? '-') ?></td>
-                                <td><?= e($inq['email'] ?? '-') ?></td>
-                                <td><?= e($inq['phone'] ?? '-') ?></td>
-                                <td><?= e(ucfirst($inq['source'] ?? '-')) ?></td>
-                                <td><?= format_currency($inq['estimated_value'] ?? 0) ?></td>
-                                <td><?= format_date($inq['created_at']) ?></td>
+                                <td><strong>
+                                        <?= e($q['quotation_no']) ?>
+                                    </strong></td>
+                                <td>
+                                    <?= e($q['client_name'] ?? '-') ?>
+                                </td>
+                                <td>
+                                    <?= e($q['subject'] ?? '-') ?>
+                                </td>
+                                <td>
+                                    <?= format_currency($q['total_amount'] ?? 0) ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    $sc = match ($q['status'] ?? '') {
+                                        'approved', 'accepted' => 'badge-fx-success',
+                                        'rejected', 'expired' => 'badge-fx-danger',
+                                        'sent', 'under_review' => 'badge-fx-warning',
+                                        default => 'badge-fx-secondary'
+                                    };
+                                    ?>
+                                    <span class="badge-fx <?= $sc ?>">
+                                        <?= ucfirst(str_replace('_', ' ', $q['status'] ?? '')) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?= format_date($q['created_at']) ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="7">
-                            <div class="empty-state">
-                                <i class="bi bi-envelope-open"></i>
-                                <h5>No new inquiries</h5>
-                                <p>New inquiries will appear here.</p>
-                            </div>
-                        </td></tr>
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">
+                                    <i class="bi bi-file-text"></i>
+                                    <h5>No quotations found</h5>
+                                    <p>Start by creating your first client quotation.</p>
+                                    <a href="<?= base_url('crm/quotations/create') ?>" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-plus-lg"></i> Create Quotation
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
