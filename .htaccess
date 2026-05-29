@@ -1,0 +1,59 @@
+# FabX ERP - Apache Rewrite Rules
+
+Options -Indexes
+Options +FollowSymLinks
+
+RewriteEngine On
+RewriteBase /fabx-erp/
+
+# Redirect to HTTPS (uncomment in production)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# Prevent access to sensitive files
+RewriteRule ^(config|core|modules|templates|logs|database)/.*\.php$ - [F,L]
+RewriteRule ^\.git - [F,L]
+RewriteRule ^composer\.(json|lock) - [F,L]
+
+# Allow access to assets
+RewriteRule ^(assets|uploads)/ - [L]
+
+# Route all requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "DENY"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# Disable server signature
+ServerSignature Off
+
+# PHP Settings
+php_flag display_errors off
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 300
+php_value session.cookie_httponly 1
+php_value session.use_only_cookies 1
+
+# Enable gzip compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Browser caching
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType text/javascript "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+</IfModule>
