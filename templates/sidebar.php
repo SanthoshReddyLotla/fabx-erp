@@ -134,6 +134,7 @@ $adminItems = [
             ['label' => 'Departments', 'url' => '/admin/departments', 'icon' => 'building'],
             ['label' => 'Settings', 'url' => '/admin/settings', 'icon' => 'sliders'],
             ['label' => 'Activity Logs', 'url' => '/admin/logs', 'icon' => 'clock-history'],
+            ['label' => 'Master Setup', 'url' => '/admin/master-setup', 'icon' => 'sliders'],
             ['label' => 'Backup', 'url' => '/admin/backup', 'icon' => 'cloud-arrow-down'],
         ]
     ]
