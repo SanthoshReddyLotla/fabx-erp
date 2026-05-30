@@ -58,8 +58,12 @@ $menuItems = [
     [
         'label' => 'Clients',
         'icon' => 'building',
-        'url' => '/clients',
         'permission' => 'read',
+        'submenu' => [
+            ['label' => 'All Clients', 'url' => '/clients', 'icon' => 'list'],
+            ['label' => 'Support Tickets', 'url' => '/clients/tickets', 'icon' => 'ticket-perforated'],
+            ['label' => 'AMC Contracts', 'url' => '/clients/amc', 'icon' => 'shield-check'],
+        ]
     ],
     [
         'label' => 'Vendors',
