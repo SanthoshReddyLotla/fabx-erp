@@ -159,6 +159,7 @@ $routes = [
     'admin/departments' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'departments', 'auth' => true],
     'admin/settings' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'settings', 'auth' => true],
     'admin/logs' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'logs', 'auth' => true],
+    'admin/master-setup' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'masterSetup', 'auth' => true],
 ];
 
 // Find matching route
