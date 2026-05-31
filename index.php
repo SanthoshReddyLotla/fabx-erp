@@ -133,6 +133,7 @@ $routes = [
     // Accounts Module
     'accounts/invoices' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'invoices', 'auth' => true],
     'accounts/invoices/create' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'createInvoice', 'auth' => true],
+    'accounts/invoices/view' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'viewInvoice', 'auth' => true],
     'accounts/payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'payments', 'auth' => true],
     'accounts/expenses' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'expenses', 'auth' => true],
     'accounts/vendor-payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'vendorPayments', 'auth' => true],

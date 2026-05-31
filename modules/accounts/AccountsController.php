@@ -59,24 +59,49 @@ class AccountsController extends Controller {
             
             $discount = (float)(input('discount_amount', 0));
             $taxable = $subtotal - $discount;
-            $gstType = input('gst_type', 'intrastate'); // intrastate or interstate
+            
+            // Automatic GST Engine State Comparison
+            $companyState = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_state'") ?: 'Maharashtra';
+            $companyGSTIN = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_gstin'") ?: '27ABCDE1234F1Z1';
+            
+            $clientId = (int)input('client_id');
+            $client = $this->db->fetchOne("SELECT state, gstin, address FROM " . $this->db->table("clients") . " WHERE id = ?", [$clientId]);
+            $clientState = $client ? trim($client['state'] ?? '') : '';
+            
+            $isSameState = true;
+            if ($client) {
+                if (!empty($clientState)) {
+                    if (strcasecmp($clientState, $companyState) !== 0) {
+                        $isSameState = false;
+                    }
+                } else {
+                    $clientGST = trim($client['gstin'] ?? '');
+                    if (strlen($clientGST) >= 2 && strlen($companyGSTIN) >= 2) {
+                        if (substr($clientGST, 0, 2) !== substr($companyGSTIN, 0, 2)) {
+                            $isSameState = false;
+                        }
+                    }
+                }
+            }
             
             $cgstRate = 0; $cgstAmt = 0;
             $sgstRate = 0; $sgstAmt = 0;
             $igstRate = 0; $igstAmt = 0;
             
-            if ($gstType === 'intrastate') {
-                $cgstRate = (float)(input('cgst_rate', 9));
-                $sgstRate = (float)(input('sgst_rate', 9));
+            if ($isSameState) {
+                $cgstRate = 9.0;
+                $sgstRate = 9.0;
                 $cgstAmt = round(($taxable * $cgstRate) / 100, 2);
                 $sgstAmt = round(($taxable * $sgstRate) / 100, 2);
             } else {
-                $igstRate = (float)(input('igst_rate', 18));
+                $igstRate = 18.0;
                 $igstAmt = round(($taxable * $igstRate) / 100, 2);
             }
             
-            $roundOff = (float)(input('round_off', 0));
-            $grandTotal = $taxable + $cgstAmt + $sgstAmt + $igstAmt + $roundOff;
+            // Auto calculate round off and grand total
+            $grandTotalBeforeRound = $taxable + $cgstAmt + $sgstAmt + $igstAmt;
+            $grandTotal = round($grandTotalBeforeRound);
+            $roundOff = round($grandTotal - $grandTotalBeforeRound, 2);
             
             $this->db->beginTransaction();
             try {
@@ -86,7 +111,7 @@ class AccountsController extends Controller {
                      subtotal, discount_amount, taxable_amount, cgst_rate, cgst_amount, sgst_rate, sgst_amount,
                      igst_rate, igst_amount, total_amount, round_off, grand_total, terms_conditions, bank_details, status, created_by, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, NOW())",
-                    [$invNo, input('invoice_date'), input('due_date'), (int)input('client_id'), input('po_reference'),
+                    [$invNo, input('invoice_date'), input('due_date'), $clientId, input('po_reference'),
                      input('billing_address'), $subtotal, $discount, $taxable,
                      $cgstRate, $cgstAmt, $sgstRate, $sgstAmt, $igstRate, $igstAmt,
                      $taxable, $roundOff, $grandTotal, input('terms_conditions'), input('bank_details'), current_user_id()]
