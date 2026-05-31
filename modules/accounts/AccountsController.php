@@ -361,4 +361,42 @@ class AccountsController extends Controller {
             'statements' => $statements
         ]);
     }
+
+    public function viewInvoice($id = null): void {
+        $this->requireCan('read');
+        $id = (int)$id;
+        
+        $invoice = $this->db->fetchOne(
+            "SELECT i.*, 
+                    c.company_name as client_name, c.gstin as client_gstin, c.email as client_email, c.phone as client_phone, c.address as client_address,
+                    p.project_name, p.project_code
+             FROM " . $this->db->table("invoices") . " i
+             INNER JOIN " . $this->db->table("clients") . " c ON i.client_id = c.id
+             LEFT JOIN " . $this->db->table("projects") . " p ON i.project_id = p.id
+             WHERE i.id = ?",
+            [$id]
+        );
+        
+        if (!$invoice) {
+            $this->flash('error', 'Invoice not found.');
+            $this->redirect('/accounts/invoices');
+        }
+        
+        $items = $this->db->fetchAll(
+            "SELECT * FROM " . $this->db->table("invoice_items") . " WHERE invoice_id = ? ORDER BY sr_no ASC",
+            [$id]
+        );
+        
+        // Fetch company profile settings
+        $settingsRows = $this->db->fetchAll("SELECT setting_key, setting_value FROM " . $this->db->table("settings") . " WHERE setting_group = 'company'");
+        $company = [];
+        foreach ($settingsRows as $row) {
+            $company[$row['setting_key']] = $row['setting_value'];
+        }
+        
+        $this->view('invoices/view', [
+            'page_title' => 'Invoice ' . $invoice['invoice_no'], 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Invoice Details',
+            'invoice' => $invoice, 'items' => $items, 'company' => $company
+        ]);
+    }
 }

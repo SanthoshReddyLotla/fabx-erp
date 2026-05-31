@@ -47,7 +47,7 @@ if (!function_exists('number_to_words')) {
 <div class="page-header d-print-none">
     <h1 class="page-title"><i class="bi bi-receipt text-primary"></i> Tax Invoice Details</h1>
     <div class="page-actions d-flex gap-2">
-        <button onclick="window.print()" class="btn btn-fx btn-fx-primary"><i class="bi bi-printer"></i> Print / Save PDF</button>
+        <button onclick="window.print()" class="btn btn-outline-secondary"><i class="bi bi-printer"></i> Print / Save PDF</button>
         <a href="<?= base_url('accounts/invoices') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to List</a>
     </div>
 </div>
@@ -78,6 +78,9 @@ if (!function_exists('number_to_words')) {
                 <tr><td class="text-muted pe-3 ps-0">Invoice Date:</td><td><?= format_date($invoice['invoice_date']) ?></td></tr>
                 <tr><td class="text-muted pe-3 ps-0">Due Date:</td><td><?= format_date($invoice['due_date']) ?></td></tr>
                 <tr><td class="text-muted pe-3 ps-0">PO Reference:</td><td class="font-monospace text-uppercase"><?= e($invoice['po_reference'] ?: '-') ?></td></tr>
+                <?php if (!empty($invoice['project_name'])): ?>
+                    <tr><td class="text-muted pe-3 ps-0">Project:</td><td><strong class="text-light-heading"><?= e($invoice['project_name']) ?></strong> <span class="text-muted small font-monospace">(<?= e($invoice['project_code']) ?>)</span></td></tr>
+                <?php endif; ?>
                 <tr><td class="text-muted pe-3 ps-0">Status:</td><td>
                     <?php 
                     $sc = match($invoice['status'] ?? '') {
