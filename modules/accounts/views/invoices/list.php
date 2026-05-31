@@ -74,7 +74,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr><td colspan="9">
- ̑                            <div class="empty-state">
+                            <div class="empty-state">
                                 <i class="bi bi-receipt"></i>
                                 <h5>No invoices found</h5>
                                 <a href="<?= base_url('accounts/invoices/create') ?>" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Create Invoice</a>
