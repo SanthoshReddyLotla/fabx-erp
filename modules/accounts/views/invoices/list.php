@@ -42,7 +42,7 @@
                     <?php if (!empty($invoices)): ?>
                         <?php foreach ($invoices as $inv): ?>
                             <tr>
-                                <td><a href="<?= base_url('accounts/invoices/view/' . $inv['id']) ?>"></a>" class="text-info fw-bold"><?= e($inv['invoice_no']) ?></a></td>
+                                <td><a href="<?= base_url('accounts/invoices/view/' . $inv['id']) ?>" class="text-info fw-bold"><?= e($inv['invoice_no']) ?></a></td>
                                 <td><?= e($inv['client_name'] ?? '-') ?></td>
                                 <td><?= format_date($inv['invoice_date']) ?></td>
                                 <td><?= format_date($inv['due_date']) ?></td>
