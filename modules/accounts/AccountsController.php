@@ -364,7 +364,11 @@ class AccountsController extends Controller {
 
     public function viewInvoice($id = null): void {
         $this->requireCan('read');
-        $id = (int)$id;
+        if (!$id) {
+            $id = (int)input('id');
+        } else {
+            $id = (int)$id;
+        }
         
         $invoice = $this->db->fetchOne(
             "SELECT i.*, 
@@ -398,5 +402,202 @@ class AccountsController extends Controller {
             'page_title' => 'Invoice ' . $invoice['invoice_no'], 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Invoice Details',
             'invoice' => $invoice, 'items' => $items, 'company' => $company
         ]);
+    }
+
+    public function editInvoice($id = null): void {
+        $this->requireCan('update');
+        if (!$id) {
+            $id = (int)input('id');
+        } else {
+            $id = (int)$id;
+        }
+
+        $invoice = $this->db->fetchOne("SELECT * FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
+        if (!$invoice) {
+            $this->flash('error', 'Invoice not found.');
+            $this->redirect('/accounts/invoices');
+        }
+
+        if ($invoice['status'] !== 'draft') {
+            $this->flash('error', 'Only draft invoices can be edited.');
+            $this->redirect('/accounts/invoices');
+        }
+
+        if (is_post()) {
+            if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/accounts/invoices/edit/' . $id); }
+            
+            $subtotal = 0;
+            $items = $_POST['items'] ?? [];
+            foreach ($items as $item) { 
+                $qty = (float)($item['quantity'] ?? 0);
+                $rate = (float)($item['unit_rate'] ?? 0);
+                $subtotal += ($qty * $rate); 
+            }
+            
+            $discount = (float)(input('discount_amount', 0));
+            $taxable = $subtotal - $discount;
+            
+            // Automatic GST Engine State Comparison
+            $companyState = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_state'") ?: 'Maharashtra';
+            $companyGSTIN = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_gstin'") ?: '27ABCDE1234F1Z1';
+            
+            $clientId = (int)input('client_id');
+            $client = $this->db->fetchOne("SELECT state, gstin FROM " . $this->db->table("clients") . " WHERE id = ?", [$clientId]);
+            $clientState = $client ? trim($client['state'] ?? '') : '';
+            
+            $isSameState = true;
+            if ($client) {
+                if (!empty($clientState)) {
+                    if (strcasecmp($clientState, $companyState) !== 0) {
+                        $isSameState = false;
+                    }
+                } else {
+                    $clientGST = trim($client['gstin'] ?? '');
+                    if (strlen($clientGST) >= 2 && strlen($companyGSTIN) >= 2) {
+                        if (substr($clientGST, 0, 2) !== substr($companyGSTIN, 0, 2)) {
+                            $isSameState = false;
+                        }
+                    }
+                }
+            }
+            
+            $cgstRate = 0; $cgstAmt = 0;
+            $sgstRate = 0; $sgstAmt = 0;
+            $igstRate = 0; $igstAmt = 0;
+            
+            if ($isSameState) {
+                $cgstRate = 9.0;
+                $sgstRate = 9.0;
+                $cgstAmt = round(($taxable * $cgstRate) / 100, 2);
+                $sgstAmt = round(($taxable * $sgstRate) / 100, 2);
+            } else {
+                $igstRate = 18.0;
+                $igstAmt = round(($taxable * $igstRate) / 100, 2);
+            }
+            
+            // Auto calculate round off and grand total
+            $grandTotalBeforeRound = $taxable + $cgstAmt + $sgstAmt + $igstAmt;
+            $grandTotal = round($grandTotalBeforeRound);
+            $roundOff = round($grandTotal - $grandTotalBeforeRound, 2);
+            
+            $this->db->beginTransaction();
+            try {
+                $this->db->execute(
+                    "UPDATE " . $this->db->table("invoices") . " 
+                     SET invoice_date = ?, due_date = ?, client_id = ?, po_reference = ?, billing_address = ?,
+                         subtotal = ?, discount_amount = ?, taxable_amount = ?, cgst_rate = ?, cgst_amount = ?,
+                         sgst_rate = ?, sgst_amount = ?, igst_rate = ?, igst_amount = ?, total_amount = ?,
+                         round_off = ?, grand_total = ?, terms_conditions = ?, bank_details = ?, updated_at = NOW()
+                     WHERE id = ?",
+                    [input('invoice_date'), input('due_date'), $clientId, input('po_reference'), input('billing_address'),
+                     $subtotal, $discount, $taxable, $cgstRate, $cgstAmt, $sgstRate, $sgstAmt, $igstRate, $igstAmt,
+                     $taxable, $roundOff, $grandTotal, input('terms_conditions'), input('bank_details'), $id]
+                );
+                
+                // Clear old items
+                $this->db->execute("DELETE FROM " . $this->db->table("invoice_items") . " WHERE invoice_id = ?", [$id]);
+                
+                // Re-insert new items
+                if (!empty($items)) {
+                    foreach ($items as $index => $item) {
+                        $qty = (float)($item['quantity'] ?? 0);
+                        $rate = (float)($item['unit_rate'] ?? 0);
+                        $itemAmt = $qty * $rate;
+                        $this->db->execute(
+                            "INSERT INTO " . $this->db->table("invoice_items") . " 
+                            (invoice_id, sr_no, description, hsn_code, quantity, uom, unit_rate, amount)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            [$id, $index + 1, $item['description'], $item['hsn_code'] ?? '',
+                             $qty, $item['uom'] ?? 'Nos', $rate, $itemAmt]
+                        );
+                    }
+                }
+                
+                $this->db->commit();
+                $this->log('INVOICE_UPDATED', "Invoice ID {$id} updated successfully");
+                $this->flash('success', "Invoice updated successfully.");
+                $this->redirect('/accounts/invoices');
+            } catch (\Exception $e) {
+                $this->db->rollback();
+                $this->flash('error', 'Database transaction failed: ' . $e->getMessage());
+                $this->redirect('/accounts/invoices/edit/' . $id);
+            }
+        }
+
+        $invoiceItems = $this->db->fetchAll("SELECT * FROM " . $this->db->table("invoice_items") . " WHERE invoice_id = ? ORDER BY sr_no ASC", [$id]);
+        $clients = $this->db->fetchAll("SELECT id, company_name, gstin, address FROM " . $this->db->table("clients") . " WHERE status = 'active'");
+        
+        $this->view('invoices/edit', [
+            'page_title' => 'Edit Invoice - ' . $invoice['invoice_no'], 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Edit Invoice',
+            'invoice' => $invoice, 'items' => $invoiceItems, 'clients' => $clients
+        ]);
+    }
+
+    public function markAsPaid($id = null): void {
+        $this->requireCan('update');
+        if (!$id) {
+            $id = (int)input('id');
+        } else {
+            $id = (int)$id;
+        }
+
+        $invoice = $this->db->fetchOne("SELECT * FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
+        if (!$invoice) {
+            $this->flash('error', 'Invoice not found.');
+            $this->redirect('/accounts/invoices');
+        }
+
+        $grandTotal = (float)$invoice['grand_total'];
+        
+        $this->db->beginTransaction();
+        try {
+            $this->db->execute(
+                "UPDATE " . $this->db->table("invoices") . " 
+                 SET paid_amount = ?, status = 'paid', paid_date = NOW(), updated_at = NOW() 
+                 WHERE id = ?",
+                [$grandTotal, $id]
+            );
+            $this->db->commit();
+            
+            $this->log('INVOICE_MARKED_PAID', "Invoice ID {$id} marked as fully paid");
+            $this->flash('success', "Invoice {$invoice['invoice_no']} has been marked as fully paid.");
+        } catch (\Exception $e) {
+            $this->db->rollback();
+            $this->flash('error', 'Failed to mark invoice as paid: ' . $e->getMessage());
+        }
+        $this->redirect('/accounts/invoices');
+    }
+
+    public function deleteInvoice($id = null): void {
+        $this->requireCan('delete');
+        if (!$id) {
+            $id = (int)input('id');
+        } else {
+            $id = (int)$id;
+        }
+
+        $invoice = $this->db->fetchOne("SELECT * FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
+        if (!$invoice) {
+            $this->flash('error', 'Invoice not found.');
+            $this->redirect('/accounts/invoices');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // Delete dependent line items
+            $this->db->execute("DELETE FROM " . $this->db->table("invoice_items") . " WHERE invoice_id = ?", [$id]);
+            
+            // Delete header row
+            $this->db->execute("DELETE FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
+            
+            $this->db->commit();
+            
+            $this->log('INVOICE_DELETED', "Invoice {$invoice['invoice_no']} deleted");
+            $this->flash('success', "Invoice {$invoice['invoice_no']} was successfully deleted.");
+        } catch (\Exception $e) {
+            $this->db->rollback();
+            $this->flash('error', 'Failed to delete invoice: ' . $e->getMessage());
+        }
+        $this->redirect('/accounts/invoices');
     }
 }

@@ -36,6 +36,7 @@
                     <tr>
                         <th>Invoice No</th><th>Client</th><th>Date</th><th>Due Date</th>
                         <th>Amount</th><th>Paid</th><th>Balance</th><th>Status</th>
+                        <th class="text-end pe-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,10 +58,22 @@
                                     }; ?>
                                     <span class="badge-fx <?= $sc ?>"><?= ucfirst($inv['status'] ?? '') ?></span>
                                 </td>
+                                <td class="actions text-end pe-3">
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="<?= base_url('accounts/invoices/view/' . $inv['id']) ?>" class="btn btn-sm btn-light" title="View"><i class="bi bi-eye"></i></a>
+                                        <?php if (($inv['status'] ?? '') === 'draft'): ?>
+                                            <a href="<?= base_url('accounts/invoices/edit/' . $inv['id']) ?>" class="btn btn-sm btn-light" title="Edit"><i class="bi bi-pencil"></i></a>
+                                        <?php endif; ?>
+                                        <?php if (($inv['status'] ?? '') !== 'paid'): ?>
+                                            <a href="<?= base_url('accounts/invoices/markAsPaid/' . $inv['id']) ?>" class="btn btn-sm btn-light text-success" title="Mark Paid" data-confirm="Are you sure you want to mark this invoice as fully paid?" onclick="return confirm('Are you sure you want to mark this invoice as fully paid?');"><i class="bi bi-check-circle-fill"></i></a>
+                                        <?php endif; ?>
+                                        <a href="<?= base_url('accounts/invoices/delete/' . $inv['id']) ?>" class="btn btn-sm btn-light text-danger" title="Delete" data-swal-confirm="Are you sure you want to delete this invoice? This action will completely remove all associated line items." onclick="return confirm('Are you sure you want to delete this invoice? This action will completely remove all associated line items.');"><i class="bi bi-trash-fill"></i></a>
+                                    </div>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="8">
+                        <tr><td colspan="9">
                             <div class="empty-state">
                                 <i class="bi bi-receipt"></i>
                                 <h5>No invoices found</h5>
