@@ -186,7 +186,7 @@ if (!$route) {
             // Extract remaining params
             $remaining = substr($uri, strlen($key));
             $remainingParams = array_filter(explode('/', trim($remaining, '/')));
-            $params = array_merge($params, $remainingParams);
+            $params = $remainingParams;
             break;
         }
     }
