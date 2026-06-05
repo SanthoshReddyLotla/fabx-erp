@@ -390,11 +390,39 @@ function upload_file(array $file, string $directory = 'documents'): array {
  * Generate PDF using basic HTML to PDF (placeholder for TCPDF/MPDF integration)
  */
 function generate_pdf(string $html, string $filename = 'document.pdf'): void {
-    // This is a placeholder - in production, use TCPDF or MPDF
-    header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    // PDF generation logic would go here
-    echo $html;
+    // Render print-optimized HTML template that triggers the native browser print dialogue
+    echo "<!DOCTYPE html>
+    <html>
+    <head>
+        <title>" . htmlspecialchars(pathinfo($filename, PATHINFO_FILENAME)) . "</title>
+        <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css' rel='stylesheet'>
+        <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css'>
+        <style>
+            body { background: #ffffff; color: #000000; font-family: 'Inter', sans-serif; padding: 40px; }
+            .print-preview-header { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-bottom: 30px; }
+            @media print {
+                body { padding: 0; }
+                .no-print { display: none !important; }
+            }
+        </style>
+    </head>
+    <body onload='window.print()'>
+        <div class='container'>
+            <div class='d-flex justify-content-between align-items-center print-preview-header no-print'>
+                <div>
+                    <h5 class='mb-1 text-dark'><i class='bi bi-file-earmark-pdf-fill text-danger'></i> Document Print Preview</h5>
+                    <span class='text-muted small'>Press print/save to generate your PDF document locally.</span>
+                </div>
+                <div class='d-flex gap-2'>
+                    <button onclick='window.print()' class='btn btn-primary btn-sm'><i class='bi bi-printer'></i> Print / Save PDF</button>
+                    <button onclick='window.close()' class='btn btn-outline-secondary btn-sm'>Close</button>
+                </div>
+            </div>
+            {$html}
+        </div>
+    </body>
+    </html>";
+    exit();
 }
 
 /**
@@ -540,10 +568,10 @@ function time_ago(string $datetime): string {
 }
 
 /**
- * Generate QR code data (placeholder for actual QR library)
+ * Generate QR code data URL using a secure public QR Code API
  */
 function generate_qr_data(string $data): string {
-    return base64_encode($data);
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' . urlencode($data);
 }
 
 /**
