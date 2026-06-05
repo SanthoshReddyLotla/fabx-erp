@@ -174,7 +174,13 @@ $route = $routes[$routeKey] ?? null;
 
 // Fallback: try to match partial routes
 if (!$route) {
-    foreach ($routes as $key => $value) {
+    // Sort keys by length descending to match most-specific routes first
+    $sortedRoutes = $routes;
+    uksort($sortedRoutes, function($a, $b) {
+        return strlen($b) <=> strlen($a);
+    });
+    
+    foreach ($sortedRoutes as $key => $value) {
         if (strpos($uri, $key) === 0) {
             $route = $value;
             // Extract remaining params
