@@ -1,15 +1,15 @@
 <?php
 /**
- * FabX ERP - Create Invoice View
+ * FabX ERP - Edit Invoice View
  */
 ?>
 
 <div class="page-header">
-    <h1 class="page-title"><i class="bi bi-receipt text-primary"></i> Create GST Tax Invoice</h1>
+    <h1 class="page-title"><i class="bi bi-receipt text-primary"></i> Edit GST Tax Invoice</h1>
     <a href="<?= base_url('accounts/invoices') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
 </div>
 
-<form method="POST" action="<?= base_url('accounts/invoices/create') ?>" id="invoiceForm" class="needs-validation" novalidate>
+<form method="POST" action="<?= base_url('accounts/invoices/edit/' . $invoice['id']) ?>" id="invoiceForm" class="needs-validation" novalidate>
     <?= csrf_field() ?>
     
     <div class="row">
@@ -22,14 +22,14 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">Invoice No</label>
-                            <input type="text" class="form-control bg-dark border-secondary text-white" value="<?= $invoice_no ?>" readonly>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" value="<?= e($invoice['invoice_no']) ?>" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">Client / Buyer <span class="text-danger">*</span></label>
                             <select class="form-select bg-dark border-secondary text-white" name="client_id" id="clientSelector" onchange="updateBillingAddress()" required>
                                 <option value="">Select Client</option>
                                 <?php foreach ($clients as $client): ?>
-                                    <option value="<?= $client['id'] ?>" data-gstin="<?= e($client['gstin'] ?? '') ?>" data-address="<?= e($client['address'] ?? '') ?>">
+                                    <option value="<?= $client['id'] ?>" data-gstin="<?= e($client['gstin'] ?? '') ?>" data-address="<?= e($client['address'] ?? '') ?>" <?= ((int)$invoice['client_id'] === (int)$client['id']) ? 'selected' : '' ?>>
                                         <?= e($client['company_name']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -38,23 +38,32 @@
                         </div>
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">Invoice Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control bg-dark border-secondary text-white" name="invoice_date" value="<?= date('Y-m-d') ?>" required>
+                            <input type="date" class="form-control bg-dark border-secondary text-white" name="invoice_date" value="<?= e($invoice['invoice_date']) ?>" required>
                         </div>
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">Due Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control bg-dark border-secondary text-white" name="due_date" value="<?= date('Y-m-d', strtotime('+30 days')) ?>" required>
+                            <input type="date" class="form-control bg-dark border-secondary text-white" name="due_date" value="<?= e($invoice['due_date']) ?>" required>
                         </div>
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">PO Reference No</label>
-                            <input type="text" class="form-control bg-dark border-secondary text-white" name="po_reference" placeholder="e.g. PO-998877">
+                            <input type="text" class="form-control bg-dark border-secondary text-white" name="po_reference" value="<?= e($invoice['po_reference']) ?>" placeholder="e.g. PO-998877">
                         </div>
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">GSTIN Reference</label>
-                            <input type="text" class="form-control bg-dark border-secondary text-white text-muted" id="gstinDisplay" placeholder="Client GSTIN" readonly>
+                            <?php
+                            $selectedClientGstin = '';
+                            foreach ($clients as $c) {
+                                if ((int)$c['id'] === (int)$invoice['client_id']) {
+                                    $selectedClientGstin = $c['gstin'];
+                                    break;
+                                }
+                            }
+                            ?>
+                            <input type="text" class="form-control bg-dark border-secondary text-white text-muted" id="gstinDisplay" value="<?= e($selectedClientGstin) ?>" placeholder="Client GSTIN" readonly>
                         </div>
                         <div class="col-12">
                             <label class="fx-form-label text-muted small">Billing / Supply Address <span class="text-danger">*</span></label>
-                            <textarea class="form-control bg-dark border-secondary text-white" name="billing_address" id="billingAddress" rows="3" required></textarea>
+                            <textarea class="form-control bg-dark border-secondary text-white" name="billing_address" id="billingAddress" rows="3" required><?= e($invoice['billing_address']) ?></textarea>
                             <div class="invalid-feedback">Billing address is required.</div>
                         </div>
                     </div>
@@ -83,30 +92,59 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="item-row">
-                                    <td class="row-num text-muted small fw-bold">1</td>
-                                    <td>
-                                        <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[0][description]" placeholder="e.g. M.S. Welded Structure" required>
-                                    </td>
-                                    <td>
-                                        <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[0][hsn_code]" placeholder="e.g. 7308">
-                                    </td>
-                                    <td>
-                                        <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white qty" name="items[0][quantity]" value="1" min="0.001" step="0.001" oninput="calculateTotals()" required>
-                                    </td>
-                                    <td>
-                                        <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[0][uom]" value="Nos" required>
-                                    </td>
-                                    <td>
-                                        <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white rate" name="items[0][unit_rate]" value="0" min="0" step="0.01" oninput="calculateTotals()" required>
-                                    </td>
-                                    <td class="text-end">
-                                        <input type="text" class="form-control form-control-sm bg-dark border-0 text-white text-end amount" readonly value="0.00">
-                                    </td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeRow(this)"><i class="bi bi-trash fs-5"></i></button>
-                                    </td>
-                                </tr>
+                                <?php if (!empty($items)): ?>
+                                    <?php foreach ($items as $index => $item): ?>
+                                        <tr class="item-row">
+                                            <td class="row-num text-muted small fw-bold"><?= $index + 1 ?></td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[<?= $index ?>][description]" value="<?= e($item['description']) ?>" placeholder="e.g. M.S. Welded Structure" required>
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[<?= $index ?>][hsn_code]" value="<?= e($item['hsn_code']) ?>" placeholder="e.g. 7308">
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white qty" name="items[<?= $index ?>][quantity]" value="<?= (float)$item['quantity'] ?>" min="0.001" step="0.001" oninput="calculateTotals()" required>
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[<?= $index ?>][uom]" value="<?= e($item['uom'] ?: 'Nos') ?>" required>
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white rate" name="items[<?= $index ?>][unit_rate]" value="<?= (float)$item['unit_rate'] ?>" min="0" step="0.01" oninput="calculateTotals()" required>
+                                            </td>
+                                            <td class="text-end">
+                                                <input type="text" class="form-control form-control-sm bg-dark border-0 text-white text-end amount" readonly value="<?= number_format($item['amount'], 2, '.', '') ?>">
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeRow(this)"><i class="bi bi-trash fs-5"></i></button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr class="item-row">
+                                        <td class="row-num text-muted small fw-bold">1</td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[0][description]" placeholder="e.g. M.S. Welded Structure" required>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[0][hsn_code]" placeholder="e.g. 7308">
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white qty" name="items[0][quantity]" value="1" min="0.001" step="0.001" oninput="calculateTotals()" required>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" name="items[0][uom]" value="Nos" required>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white rate" name="items[0][unit_rate]" value="0" min="0" step="0.01" oninput="calculateTotals()" required>
+                                        </td>
+                                        <td class="text-end">
+                                            <input type="text" class="form-control form-control-sm bg-dark border-0 text-white text-end amount" readonly value="0.00">
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeRow(this)"><i class="bi bi-trash fs-5"></i></button>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -120,18 +158,18 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">Bank Details</label>
-                            <textarea class="form-control bg-dark border-secondary text-white" name="bank_details" rows="4" placeholder="Bank: State Bank of India&#10;A/C: 12345678901&#10;IFSC: SBIN0001234&#10;Branch: Industrial Area"></textarea>
+                            <textarea class="form-control bg-dark border-secondary text-white" name="bank_details" rows="4" placeholder="Bank: State Bank of India&#10;A/C: 12345678901&#10;IFSC: SBIN0001234&#10;Branch: Industrial Area"><?= e($invoice['bank_details']) ?></textarea>
                         </div>
                         <div class="col-md-6">
                             <label class="fx-form-label text-muted small">Terms & Conditions</label>
-                            <textarea class="form-control bg-dark border-secondary text-white" name="terms_conditions" rows="4" placeholder="1. Interest @ 18% p.a. charged after due date.&#10;2. Goods once sold will not be taken back.&#10;3. Disputes subject to local jurisdiction."></textarea>
+                            <textarea class="form-control bg-dark border-secondary text-white" name="terms_conditions" rows="4" placeholder="1. Interest @ 18% p.a. charged after due date.&#10;2. Goods once sold will not be taken back.&#10;3. Disputes subject to local jurisdiction."><?= e($invoice['terms_conditions']) ?></textarea>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="d-flex gap-2 mb-4">
-                <button type="submit" class="btn btn-fx btn-fx-primary"><i class="bi bi-receipt-cutoff"></i> Save & Generate Invoice</button>
+                <button type="submit" class="btn btn-fx btn-fx-primary"><i class="bi bi-receipt-cutoff"></i> Save Changes</button>
                 <a href="<?= base_url('accounts/invoices') ?>" class="btn btn-outline-secondary">Cancel</a>
             </div>
         </div>
@@ -143,78 +181,81 @@
                 <div class="fx-card-body p-4">
                     <div class="d-flex justify-content-between mb-3 text-muted small">
                         <span>Items Subtotal:</span>
-                        <strong id="subtotalDisplay" class="text-white">₹ 0.00</strong>
+                        <strong id="subtotalDisplay" class="text-white">₹ <?= number_format($invoice['subtotal'], 2) ?></strong>
                     </div>
                     
                     <div class="mb-3">
                         <label class="fx-form-label text-muted small d-block mb-1">Discount Amount (₹):</label>
-                        <input type="number" class="form-control bg-dark border-secondary text-white text-end" name="discount_amount" id="discountAmount" value="0" min="0" step="0.01" oninput="calculateTotals()">
+                        <input type="number" class="form-control bg-dark border-secondary text-white text-end" name="discount_amount" id="discountAmount" value="<?= (float)$invoice['discount_amount'] ?>" min="0" step="0.01" oninput="calculateTotals()">
                     </div>
 
                     <div class="d-flex justify-content-between mb-3 text-muted small border-bottom border-secondary pb-3">
                         <span>Taxable Value:</span>
-                        <strong id="taxableDisplay" class="text-white">₹ 0.00</strong>
+                        <strong id="taxableDisplay" class="text-white">₹ <?= number_format($invoice['taxable_amount'], 2) ?></strong>
                     </div>
 
+                    <?php
+                    $isInterstate = ((float)$invoice['igst_amount'] > 0);
+                    ?>
                     <div class="mb-3">
                         <label class="fx-form-label text-muted small d-block mb-1">GST Classification:</label>
                         <div class="d-flex gap-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="gst_type" id="intrastateGst" value="intrastate" checked onchange="calculateTotals()">
+                                <input class="form-check-input" type="radio" name="gst_type" id="intrastateGst" value="intrastate" <?= !$isInterstate ? 'checked' : '' ?> onchange="calculateTotals()">
                                 <label class="form-check-label text-white small" for="intrastateGst">CGST + SGST (Intrastate)</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="gst_type" id="interstateGst" value="interstate" onchange="calculateTotals()">
+                                <input class="form-check-input" type="radio" name="gst_type" id="interstateGst" value="interstate" <?= $isInterstate ? 'checked' : '' ?> onchange="calculateTotals()">
                                 <label class="form-check-label text-white small" for="interstateGst">IGST (Interstate)</label>
                             </div>
                         </div>
                     </div>
 
                     <!-- Split Tax Displays -->
-                    <div id="splitGstSection">
+                    <div id="splitGstSection" class="<?= $isInterstate ? 'd-none' : '' ?>">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <span class="text-muted small">CGST Rate (%):</span>
                             <div class="input-group input-group-sm" style="width: 80px;">
-                                <input type="number" class="form-control bg-dark border-secondary text-white text-center" name="cgst_rate" value="9" min="0" step="0.1" oninput="calculateTotals()">
+                                <input type="number" class="form-control bg-dark border-secondary text-white text-center" name="cgst_rate" value="<?= (float)$invoice['cgst_rate'] ?: 9 ?>" min="0" step="0.1" oninput="calculateTotals()">
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mb-3 text-muted small">
                             <span>CGST Amount:</span>
-                            <strong id="cgstDisplay" class="text-white">₹ 0.00</strong>
+                            <strong id="cgstDisplay" class="text-white">₹ <?= number_format($invoice['cgst_amount'], 2) ?></strong>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <span class="text-muted small">SGST Rate (%):</span>
                             <div class="input-group input-group-sm" style="width: 80px;">
-                                <input type="number" class="form-control bg-dark border-secondary text-white text-center" name="sgst_rate" value="9" min="0" step="0.1" oninput="calculateTotals()">
+                                <input type="number" class="form-control bg-dark border-secondary text-white text-center" name="sgst_rate" value="<?= (float)$invoice['sgst_rate'] ?: 9 ?>" min="0" step="0.1" oninput="calculateTotals()">
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mb-3 text-muted small border-bottom border-secondary pb-3">
                             <span>SGST Amount:</span>
-                            <strong id="sgstDisplay" class="text-white">₹ 0.00</strong>
+                            <strong id="sgstDisplay" class="text-white">₹ <?= number_format($invoice['sgst_amount'], 2) ?></strong>
                         </div>
                     </div>
 
-                    <div id="integratedGstSection" class="d-none">
+                    <div id="integratedGstSection" class="<?= !$isInterstate ? 'd-none' : '' ?>">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <span class="text-muted small">IGST Rate (%):</span>
                             <div class="input-group input-group-sm" style="width: 80px;">
-                                <input type="number" class="form-control bg-dark border-secondary text-white text-center" name="igst_rate" value="18" min="0" step="0.1" oninput="calculateTotals()">
+                                <input type="number" class="form-control bg-dark border-secondary text-white text-center" name="igst_rate" value="<?= (float)$invoice['igst_rate'] ?: 18 ?>" min="0" step="0.1" oninput="calculateTotals()">
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mb-3 text-muted small border-bottom border-secondary pb-3">
                             <span>IGST Amount:</span>
-                            <strong id="igstDisplay" class="text-white">₹ 0.00</strong>
+                            <strong id="igstDisplay" class="text-white">₹ <?= number_format($invoice['igst_amount'], 2) ?></strong>
                         </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="fx-form-label text-muted small d-block mb-1">Adjustment / Round Off (₹):</label>
-                        <input type="number" class="form-control bg-dark border-secondary text-white text-end" name="round_off" id="roundOff" value="0.00" step="0.01" oninput="calculateTotals()">
+                        <input type="number" class="form-control bg-dark border-secondary text-white text-end" name="round_off" id="roundOff" value="<?= number_format($invoice['round_off'], 2, '.', '') ?>" step="0.01" oninput="calculateTotals()">
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center mb-1 pt-2">
                         <span class="h5 mb-0 text-light-heading">Grand Total:</span>
-                        <strong class="h4 text-success mb-0" id="grandTotalDisplay">₹ 0.00</strong>
+                        <strong class="h4 text-success mb-0" id="grandTotalDisplay">₹ <?= number_format($invoice['grand_total'], 2) ?></strong>
                     </div>
                     <small class="text-muted d-block text-end" style="font-size:0.75rem;">INR Currency</small>
                 </div>
@@ -224,7 +265,7 @@
 </form>
 
 <script>
-let rowCount = 1;
+let rowCount = <?= count($items) ?: 1 ?>;
 
 function updateBillingAddress() {
     const selector = document.getElementById('clientSelector');

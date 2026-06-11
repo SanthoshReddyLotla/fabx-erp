@@ -81,12 +81,23 @@ function format_indian_number(float $number): string {
 }
 
 /**
+ * Random uppercase alphanumeric suffix for document numbers
+ */
+function code_suffix(int $length = 5): string {
+    $chars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    $out = '';
+    for ($i = 0; $i < $length; $i++) {
+        $out .= $chars[random_int(0, strlen($chars) - 1)];
+    }
+    return $out;
+}
+
+/**
  * Generate a unique code
  */
 function generate_code(string $prefix, int $length = 5): string {
     $timestamp = date('Ymd');
-    $random = strtoupper(substr(uniqid(), -$length));
-    return $prefix . '-' . $timestamp . '-' . $random;
+    return $prefix . '-' . $timestamp . '-' . code_suffix($length);
 }
 
 /**
@@ -95,8 +106,7 @@ function generate_code(string $prefix, int $length = 5): string {
 function generate_quotation_no(): string {
     $year = date('Y');
     $month = date('m');
-    $random = strtoupper(substr(uniqid(), -4));
-    return 'QT-' . $year . $month . '-' . $random;
+    return 'QT-' . $year . $month . '-' . code_suffix(4);
 }
 
 /**
@@ -105,8 +115,7 @@ function generate_quotation_no(): string {
 function generate_invoice_no(): string {
     $year = date('Y');
     $month = date('m');
-    $random = strtoupper(substr(uniqid(), -4));
-    return 'INV-' . $year . $month . '-' . $random;
+    return 'INV-' . $year . $month . '-' . code_suffix(4);
 }
 
 /**
@@ -115,8 +124,7 @@ function generate_invoice_no(): string {
 function generate_po_no(): string {
     $year = date('Y');
     $month = date('m');
-    $random = strtoupper(substr(uniqid(), -4));
-    return 'PO-' . $year . $month . '-' . $random;
+    return 'PO-' . $year . $month . '-' . code_suffix(4);
 }
 
 /**
@@ -124,8 +132,7 @@ function generate_po_no(): string {
  */
 function generate_ncr_no(): string {
     $year = date('Y');
-    $random = strtoupper(substr(uniqid(), -4));
-    return 'NCR-' . $year . '-' . $random;
+    return 'NCR-' . $year . '-' . code_suffix(4);
 }
 
 /**
@@ -133,8 +140,7 @@ function generate_ncr_no(): string {
  */
 function generate_capa_no(): string {
     $year = date('Y');
-    $random = strtoupper(substr(uniqid(), -4));
-    return 'CAPA-' . $year . '-' . $random;
+    return 'CAPA-' . $year . '-' . code_suffix(4);
 }
 
 /**
@@ -142,8 +148,7 @@ function generate_capa_no(): string {
  */
 function generate_project_code(): string {
     $year = date('Y');
-    $random = strtoupper(substr(uniqid(), -5));
-    return 'PRJ-' . $year . '-' . $random;
+    return 'PRJ-' . $year . '-' . code_suffix(5);
 }
 
 /**
@@ -152,8 +157,7 @@ function generate_project_code(): string {
 function generate_wo_no(): string {
     $year = date('Y');
     $month = date('m');
-    $random = strtoupper(substr(uniqid(), -4));
-    return 'WO-' . $year . $month . '-' . $random;
+    return 'WO-' . $year . $month . '-' . code_suffix(4);
 }
 
 /**
@@ -189,6 +193,15 @@ function input(string $key, $default = null) {
         return is_array($_GET[$key]) ? sanitize_array($_GET[$key]) : sanitize($_GET[$key]);
     }
     return $default;
+}
+
+/**
+ * Get raw request value without sanitization.
+ * Use for passwords: sanitize() would strip/encode characters and silently
+ * change the credential before hashing or verification.
+ */
+function input_raw(string $key, $default = null) {
+    return $_POST[$key] ?? $_GET[$key] ?? $default;
 }
 
 /**
@@ -332,6 +345,46 @@ function log_activity(string $action, string $description = '', ?int $userId = n
 }
 
 /**
+ * Create an in-app notification for a user and/or department
+ */
+function notify(string $title, string $message = '', string $type = 'info', ?int $userId = null, ?string $department = null, string $module = '', string $link = ''): void {
+    try {
+        $db = Core\Database::getInstance();
+        $db->execute(
+            "INSERT INTO " . DB_PREFIX . "notifications (user_id, department, title, message, type, module, link, is_read, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())",
+            [$userId, $department, $title, $message, $type, $module, $link]
+        );
+    } catch (Exception $e) {
+        error_log("Notification error: " . $e->getMessage());
+    }
+}
+
+/**
+ * Send an email. Uses PHP mail(); failures are logged, never fatal.
+ */
+function send_email(string $to, string $subject, string $htmlBody): bool {
+    if (!ENABLE_EMAIL_NOTIFICATIONS) return false;
+    $headers = [
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'From: ' . SMTP_FROM_NAME . ' <' . SMTP_FROM . '>',
+        'Reply-To: ' . SMTP_FROM,
+        'X-Mailer: FabX-ERP',
+    ];
+    try {
+        $sent = @mail($to, $subject, $htmlBody, implode("\r\n", $headers));
+        if (!$sent) {
+            error_log("send_email failed for {$to}: {$subject}");
+        }
+        return $sent;
+    } catch (Exception $e) {
+        error_log("send_email error: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Calculate GST
  */
 function calculate_gst(float $amount, float $rate = DEFAULT_GST_RATE): array {
@@ -366,7 +419,12 @@ function upload_file(array $file, string $directory = 'documents'): array {
         $result['error'] = 'Invalid file type. Allowed: ' . implode(', ', ALLOWED_EXTENSIONS);
         return $result;
     }
-    
+
+    if (!verify_upload_security($file, $ext)) {
+        $result['error'] = 'File content does not match its extension.';
+        return $result;
+    }
+
     $uploadDir = UPLOAD_PATH . $directory . '/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
@@ -390,11 +448,39 @@ function upload_file(array $file, string $directory = 'documents'): array {
  * Generate PDF using basic HTML to PDF (placeholder for TCPDF/MPDF integration)
  */
 function generate_pdf(string $html, string $filename = 'document.pdf'): void {
-    // This is a placeholder - in production, use TCPDF or MPDF
-    header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    // PDF generation logic would go here
-    echo $html;
+    // Render print-optimized HTML template that triggers the native browser print dialogue
+    echo "<!DOCTYPE html>
+    <html>
+    <head>
+        <title>" . htmlspecialchars(pathinfo($filename, PATHINFO_FILENAME)) . "</title>
+        <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css' rel='stylesheet'>
+        <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css'>
+        <style>
+            body { background: #ffffff; color: #000000; font-family: 'Inter', sans-serif; padding: 40px; }
+            .print-preview-header { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-bottom: 30px; }
+            @media print {
+                body { padding: 0; }
+                .no-print { display: none !important; }
+            }
+        </style>
+    </head>
+    <body onload='window.print()'>
+        <div class='container'>
+            <div class='d-flex justify-content-between align-items-center print-preview-header no-print'>
+                <div>
+                    <h5 class='mb-1 text-dark'><i class='bi bi-file-earmark-pdf-fill text-danger'></i> Document Print Preview</h5>
+                    <span class='text-muted small'>Press print/save to generate your PDF document locally.</span>
+                </div>
+                <div class='d-flex gap-2'>
+                    <button onclick='window.print()' class='btn btn-primary btn-sm'><i class='bi bi-printer'></i> Print / Save PDF</button>
+                    <button onclick='window.close()' class='btn btn-outline-secondary btn-sm'>Close</button>
+                </div>
+            </div>
+            {$html}
+        </div>
+    </body>
+    </html>";
+    exit();
 }
 
 /**
@@ -416,7 +502,7 @@ function json_response(bool $success, string $message = '', array $data = []): v
 function paginate(int $total, int $page = 1, int $perPage = DEFAULT_PER_PAGE): array {
     $page = max(1, $page);
     $perPage = min(max(1, $perPage), MAX_PER_PAGE);
-    $totalPages = (int)ceil($total / $perPage);
+    $totalPages = max(1, (int)ceil($total / $perPage));
     $page = min($page, $totalPages);
     $offset = ($page - 1) * $perPage;
     
@@ -540,10 +626,10 @@ function time_ago(string $datetime): string {
 }
 
 /**
- * Generate QR code data (placeholder for actual QR library)
+ * Generate QR code data URL using a secure public QR Code API
  */
 function generate_qr_data(string $data): string {
-    return base64_encode($data);
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' . urlencode($data);
 }
 
 /**

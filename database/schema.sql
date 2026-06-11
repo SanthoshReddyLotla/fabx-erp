@@ -7,9 +7,11 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- Create Database
-CREATE DATABASE IF NOT EXISTS fabx_erp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE fabx_erp;
+-- NOTE: On shared hosting (cPanel/Hostinger) the database is created from the
+-- control panel and you import this file into it directly. Only uncomment the
+-- lines below when running on a server where you can create databases yourself.
+-- CREATE DATABASE IF NOT EXISTS fabx_erp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE fabx_erp;
 
 -- ========================================================
 -- 1. CORE & AUTHENTICATION TABLES
@@ -21,6 +23,7 @@ CREATE TABLE fabx_departments (
     name VARCHAR(100) NOT NULL,
     code VARCHAR(20) NOT NULL UNIQUE,
     description TEXT,
+    cost_center VARCHAR(50),
     head_id INT NULL,
     status ENUM('active','inactive') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1556,8 +1559,8 @@ INSERT INTO fabx_roles (name, description, permissions, is_system) VALUES
 
 -- Default Super Admin User (password: Admin@123)
 INSERT INTO fabx_users (employee_code, first_name, last_name, email, phone, password, role_id, department_id, designation, joining_date, status, last_login) VALUES
-('FABX001', 'System', 'Administrator', 'admin@fabxengineering.com', '9999999999', 
- '$2y$12$K0ByB.6YI2/OYrB4fQOYLe6QdRg6XnYlYqYqYqYqYqYqYqYqYqYqYqY', 1, 1, 'System Administrator', '2024-01-01', 'active', NOW());
+('FABX001', 'System', 'Administrator', 'admin@fabxengineering.com', '9999999999',
+ '$2y$12$2lsbDd3eeSgWxxyaSN26T.y7.TvjU4uYzNwL4wrCAyH6UKRVz7xzS', 1, 1, 'System Administrator', '2024-01-01', 'active', NOW());
 
 -- Default Settings
 CREATE TABLE fabx_settings (

@@ -1,4 +1,4 @@
-<?php /** FabX ERP - Work Orders */ ?>
+<?php /** FabX ERP - Shop Floor Work Orders Tracking Board */ ?>
 <div class="page-header">
     <h1 class="page-title"><i class="bi bi-tools"></i> Shop Floor Work Orders Ledger</h1>
 </div>
@@ -37,6 +37,7 @@
                         <th>Project</th>
                         <th>Work Description</th>
                         <th>Assigned Operator</th>
+                        <th>Machine Allocation</th>
                         <th>Timeline</th>
                         <th class="text-center">Hours (Est/Act)</th>
                         <th class="text-center">Priority</th>
@@ -79,7 +80,7 @@
                                     <small class="text-muted d-block" style="font-size:0.7rem;">Date: <?= format_date($wo['wo_date']) ?></small>
                                 </td>
                                 <td>
-                                    <div class="fw-semibold text-light-heading text-wrap" style="max-width: 250px;"><?= e($wo['description']) ?></div>
+                                    <div class="fw-semibold text-light-heading text-wrap" style="max-width: 200px;"><?= e($wo['description']) ?></div>
                                     <?php if ($wo['uom'] && $wo['quantity']): ?>
                                         <small class="text-muted">Target Qty: <?= number_format($wo['quantity'], 2) ?> <?= e($wo['uom']) ?></small>
                                     <?php endif; ?>
@@ -91,6 +92,15 @@
                                         </div>
                                         <span class="small fw-semibold"><?= e($wo['assigned_name'] ?? 'Unassigned') ?></span>
                                     </div>
+                                </td>
+                                <td>
+                                    <?php if (!empty($wo['machine_id'])): ?>
+                                        <span class="badge bg-dark border border-secondary text-light-heading font-monospace py-2 px-3">
+                                            <i class="bi bi-cpu text-primary me-1"></i> MC-<?= sprintf('%03d', $wo['machine_id']) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted small">No Allocation</span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="small">
                                     <div>Start: <?= format_date($wo['start_date']) ?></div>
@@ -119,7 +129,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9">
+                            <td colspan="10">
                                 <div class="empty-state py-5">
                                     <i class="bi bi-tools display-4 mb-3 d-block text-muted"></i>
                                     <h5>No Work Orders Found</h5>

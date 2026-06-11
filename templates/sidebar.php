@@ -58,8 +58,12 @@ $menuItems = [
     [
         'label' => 'Clients',
         'icon' => 'building',
-        'url' => '/clients',
         'permission' => 'read',
+        'submenu' => [
+            ['label' => 'All Clients', 'url' => '/clients', 'icon' => 'list'],
+            ['label' => 'Support Tickets', 'url' => '/clients/tickets', 'icon' => 'ticket-perforated'],
+            ['label' => 'AMC Contracts', 'url' => '/clients/amc', 'icon' => 'shield-check'],
+        ]
     ],
     [
         'label' => 'Vendors',
@@ -134,6 +138,7 @@ $adminItems = [
             ['label' => 'Departments', 'url' => '/admin/departments', 'icon' => 'building'],
             ['label' => 'Settings', 'url' => '/admin/settings', 'icon' => 'sliders'],
             ['label' => 'Activity Logs', 'url' => '/admin/logs', 'icon' => 'clock-history'],
+            ['label' => 'Master Setup', 'url' => '/admin/master-setup', 'icon' => 'sliders'],
             ['label' => 'Backup', 'url' => '/admin/backup', 'icon' => 'cloud-arrow-down'],
         ]
     ]

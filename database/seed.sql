@@ -3,7 +3,9 @@
 -- Sample data for testing and demonstration
 -- ========================================================
 
-USE fabx_erp;
+-- NOTE: Import this into the same database you imported schema.sql into.
+-- Only uncomment when the database is literally named fabx_erp.
+-- USE fabx_erp;
 
 -- Document Categories
 INSERT INTO fabx_doc_categories (name, code, description, retention_period) VALUES
@@ -83,15 +85,15 @@ INSERT INTO fabx_projects (project_code, project_name, client_id, description, p
 
 -- Sample NCRs
 INSERT INTO fabx_ncr (ncr_no, ncr_date, source, project_id, reported_by, reported_date, description, severity, category, status) VALUES
-(generate_ncr_no(), '2024-03-10', 'incoming_inspection', 2, 1, '2024-03-10', 'Plate thickness 9.2mm measured against specified 10mm for vessel shell plates. MTC indicates 10mm but actual measurement shows 9.2mm.', 'major', 'material', 'open'),
-(generate_ncr_no(), '2024-03-15', 'inprocess_inspection', 1, 1, '2024-03-15', 'Weld profile on tank bottom plate - excessive reinforcement (4mm against max 3mm as per WPS). WPS No: WPS-2024-012.', 'minor', 'process', 'in_progress'),
-(generate_ncr_no(), '2024-03-20', 'final_inspection', 3, 1, '2024-03-20', 'Dimensional check shows spool SP-045 length 2980mm against drawing dimension 3000mm. Tolerance +/- 2mm exceeded.', 'major', 'process', 'open'),
-(generate_ncr_no(), '2024-02-28', 'audit', NULL, 1, '2024-02-28', 'Internal audit finding: WPS qualification record for procedure WPS-2024-008 not available. PQR reference missing.', 'major', 'documentation', 'in_progress');
+('NCR-2024-A1B2', '2024-03-10', 'incoming_inspection', 2, 1, '2024-03-10', 'Plate thickness 9.2mm measured against specified 10mm for vessel shell plates. MTC indicates 10mm but actual measurement shows 9.2mm.', 'major', 'material', 'open'),
+('NCR-2024-C3D4', '2024-03-15', 'inprocess_inspection', 1, 1, '2024-03-15', 'Weld profile on tank bottom plate - excessive reinforcement (4mm against max 3mm as per WPS). WPS No: WPS-2024-012.', 'minor', 'process', 'in_progress'),
+('NCR-2024-E5F6', '2024-03-20', 'final_inspection', 3, 1, '2024-03-20', 'Dimensional check shows spool SP-045 length 2980mm against drawing dimension 3000mm. Tolerance +/- 2mm exceeded.', 'major', 'process', 'open'),
+('NCR-2024-G7H8', '2024-02-28', 'audit', NULL, 1, '2024-02-28', 'Internal audit finding: WPS qualification record for procedure WPS-2024-008 not available. PQR reference missing.', 'major', 'documentation', 'in_progress');
 
 -- Sample CAPAs
 INSERT INTO fabx_capa (capa_no, source_type, source_id, description, root_cause_analysis, root_cause_method, corrective_action, preventive_action, responsible_person, target_date, status, created_by) VALUES
-(generate_capa_no(), 'ncr', 1, 'Incoming plate thickness non-conformance', 'Supplier quality control gap. Ultrasonic thickness gauge at supplier end was not calibrated.', '5_why', 'Reject non-conforming batch. Request replacement from supplier.', 'Implement incoming inspection checklist with mandatory thickness verification. Calibrate UT gauge monthly.', 1, '2024-04-15', 'open', 1),
-(generate_capa_no(), 'ncr', 2, 'Weld reinforcement excess', 'Welder not following WPS parameters. Travel speed too slow.', '5_why', 'Re-grind weld to acceptable profile. Re-train welder on WPS compliance.', 'Implement weld visual inspection after each pass. Use weld gauges.', 1, '2024-04-01', 'in_progress', 1);
+('CAPA-2024-A1B2', 'ncr', 1, 'Incoming plate thickness non-conformance', 'Supplier quality control gap. Ultrasonic thickness gauge at supplier end was not calibrated.', '5_why', 'Reject non-conforming batch. Request replacement from supplier.', 'Implement incoming inspection checklist with mandatory thickness verification. Calibrate UT gauge monthly.', 1, '2024-04-15', 'open', 1),
+('CAPA-2024-C3D4', 'ncr', 2, 'Weld reinforcement excess', 'Welder not following WPS parameters. Travel speed too slow.', '5_why', 'Re-grind weld to acceptable profile. Re-train welder on WPS compliance.', 'Implement weld visual inspection after each pass. Use weld gauges.', 1, '2024-04-01', 'in_progress', 1);
 
 -- Sample Calibrations
 INSERT INTO fabx_calibrations (equipment_id, equipment_name, manufacturer, model_no, serial_no, location, department_id, range_value, accuracy, frequency, last_calibration_date, next_calibration_date, calibrated_by, status) VALUES
@@ -103,9 +105,9 @@ INSERT INTO fabx_calibrations (equipment_id, equipment_name, manufacturer, model
 
 -- Sample Quotations
 INSERT INTO fabx_quotations (quotation_no, quotation_date, client_id, subject, description, terms_conditions, delivery_terms, payment_terms, validity_days, subtotal, gst_rate, gst_amount, total_amount, prepared_by, status) VALUES
-(generate_quotation_no(), '2024-03-01', 1, 'Quotation for Tank Fabrication Works', 'Fabrication of 2 nos 250 KL storage tanks complete with internals, nozzles, and accessories', '1. Validity: 30 days\n2. Taxes: GST extra @ 18%\n3. Packing: Standard seaworthy', '8-10 weeks ex-works', '30% advance, 60% against dispatch, 10% after erection', 30, 4500000, 18, 810000, 5310000, 1, 'sent'),
-(generate_quotation_no(), '2024-03-10', 3, 'Quotation for Pressure Vessel', 'Design, fabrication and testing of 1 no. pressure vessel as per ASME Sec VIII Div 1', '1. Design approval required before fabrication\n2. Third party inspection by TUV\n3. Datasheets to be provided by client', '12-14 weeks ex-works', '30% advance, 40% progressive, 30% against dispatch', 30, 3200000, 18, 576000, 3776000, 1, 'approved'),
-(generate_quotation_no(), '2024-03-15', 4, 'Structural Steel Fabrication', 'Supply and fabrication of structural steel platform and staircase', '1. Rate valid for 15 days\n2. Scope as per BOQ attached\n3. Erection scope separate', '6-8 weeks ex-works', '50% advance, 50% against delivery', 15, 850000, 18, 153000, 1003000, 1, 'draft');
+('QT-202403-A1B2', '2024-03-01', 1, 'Quotation for Tank Fabrication Works', 'Fabrication of 2 nos 250 KL storage tanks complete with internals, nozzles, and accessories', '1. Validity: 30 days\n2. Taxes: GST extra @ 18%\n3. Packing: Standard seaworthy', '8-10 weeks ex-works', '30% advance, 60% against dispatch, 10% after erection', 30, 4500000, 18, 810000, 5310000, 1, 'sent'),
+('QT-202403-C3D4', '2024-03-10', 3, 'Quotation for Pressure Vessel', 'Design, fabrication and testing of 1 no. pressure vessel as per ASME Sec VIII Div 1', '1. Design approval required before fabrication\n2. Third party inspection by TUV\n3. Datasheets to be provided by client', '12-14 weeks ex-works', '30% advance, 40% progressive, 30% against dispatch', 30, 3200000, 18, 576000, 3776000, 1, 'approved'),
+('QT-202403-E5F6', '2024-03-15', 4, 'Structural Steel Fabrication', 'Supply and fabrication of structural steel platform and staircase', '1. Rate valid for 15 days\n2. Scope as per BOQ attached\n3. Erection scope separate', '6-8 weeks ex-works', '50% advance, 50% against delivery', 15, 850000, 18, 153000, 1003000, 1, 'draft');
 
 -- Sample Purchase Requisitions
 INSERT INTO fabx_purchase_requisitions (pr_no, pr_date, department_id, required_by_date, justification, requested_by, status) VALUES

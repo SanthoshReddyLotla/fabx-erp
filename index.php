@@ -1,9 +1,4 @@
 <?php
-
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-
 /**
  * FabX Engineering ERP - Front Controller
  * Single entry point - Routes all requests to appropriate controllers
@@ -113,6 +108,8 @@ $routes = [
     'clients' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'index', 'auth' => true],
     'clients/create' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'create', 'auth' => true],
     'clients/view' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'show', 'auth' => true],
+    'clients/tickets' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'tickets', 'auth' => true],
+    'clients/amc' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'amc', 'auth' => true],
 
     // Vendors Module
     'vendors' => ['module' => 'vendors', 'controller' => 'VendorController', 'action' => 'index', 'auth' => true],
@@ -131,6 +128,10 @@ $routes = [
     // Accounts Module
     'accounts/invoices' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'invoices', 'auth' => true],
     'accounts/invoices/create' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'createInvoice', 'auth' => true],
+    'accounts/invoices/view' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'viewInvoice', 'auth' => true],
+    'accounts/invoices/edit' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'editInvoice', 'auth' => true],
+    'accounts/invoices/markAsPaid' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'markAsPaid', 'auth' => true],
+    'accounts/invoices/delete' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'deleteInvoice', 'auth' => true],
     'accounts/payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'payments', 'auth' => true],
     'accounts/expenses' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'expenses', 'auth' => true],
     'accounts/vendor-payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'vendorPayments', 'auth' => true],
@@ -159,6 +160,7 @@ $routes = [
     'admin/departments' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'departments', 'auth' => true],
     'admin/settings' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'settings', 'auth' => true],
     'admin/logs' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'logs', 'auth' => true],
+    'admin/master-setup' => ['module' => 'admin', 'controller' => 'AdminController', 'action' => 'masterSetup', 'auth' => true],
 ];
 
 // Find matching route
@@ -167,16 +169,27 @@ $route = $routes[$routeKey] ?? null;
 
 // Fallback: try to match partial routes
 if (!$route) {
-    foreach ($routes as $key => $value) {
+    // Sort keys by length descending to match most-specific routes first
+    $sortedRoutes = $routes;
+    uksort($sortedRoutes, function($a, $b) {
+        return strlen($b) <=> strlen($a);
+    });
+    
+    foreach ($sortedRoutes as $key => $value) {
         if (strpos($uri, $key) === 0) {
             $route = $value;
             // Extract remaining params
             $remaining = substr($uri, strlen($key));
             $remainingParams = array_filter(explode('/', trim($remaining, '/')));
-            $params = array_merge($params, $remainingParams);
+            $params = $remainingParams;
             break;
         }
     }
+}
+
+// Restore session from remember-me cookie if present
+if (!is_logged_in()) {
+    attempt_remember_login();
 }
 
 // Default to dashboard if no route found

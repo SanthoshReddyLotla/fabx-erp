@@ -1,6 +1,6 @@
-<?php /** FabX ERP - Drawings */ ?>
+<?php /** FabX ERP - Drawings Cost & Variance Matrix */ ?>
 <div class="page-header">
-    <h1 class="page-title"><i class="bi bi-pencil-square"></i> Engineering Drawings Vault</h1>
+    <h1 class="page-title"><i class="bi bi-pencil-square"></i> Engineering Drawings & Blueprints Vault</h1>
 </div>
 
 <!-- Filters Bar -->
@@ -24,7 +24,7 @@
 <!-- Drawings Ledger Card -->
 <div class="fx-card">
     <div class="fx-card-header py-3 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-file-earmark-ruled"></i> Blueprint & Revision Tracker Ledger</h5>
+        <h5 class="mb-0"><i class="bi bi-file-earmark-ruled"></i> Blueprint Revision Tracker Grid</h5>
         <span class="badge bg-dark border border-secondary text-muted">Showing <?= count($drawings) ?> Blueprint Revisions</span>
     </div>
     
@@ -35,12 +35,12 @@
                     <tr>
                         <th>Drawing Number</th>
                         <th>Project</th>
-                        <th>Title / Specification</th>
+                        <th>Title / Description</th>
                         <th>Drawing Type</th>
                         <th class="text-center">Revision</th>
                         <th>Prepared By</th>
                         <th>Approval Date</th>
-                        <th class="text-center">Approval Gate</th>
+                        <th class="text-center">Engineering Check Phase</th>
                         <th class="text-center">Document File</th>
                     </tr>
                 </thead>
@@ -57,9 +57,11 @@
                             };
                             
                             $typeClass = match($drw['drawing_type']) {
+                                'general' => 'bg-dark text-white border border-secondary border-opacity-50',
                                 'fabrication' => 'bg-info bg-opacity-10 text-info border border-info border-opacity-25',
                                 'assembly' => 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25',
-                                'erection' => 'bg-success bg-opacity-10 text-success border border-success border-opacity-25',
+                                'detail' => 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25',
+                                'layout' => 'bg-success bg-opacity-10 text-success border border-success border-opacity-25',
                                 default => 'bg-dark text-secondary border border-secondary border-opacity-25'
                             };
                         ?>
@@ -70,7 +72,7 @@
                                 </td>
                                 <td>
                                     <div class="fw-semibold text-light-heading"><?= e($drw['title']) ?></div>
-                                    <small class="text-muted d-block text-truncate" style="max-width: 250px;"><?= e($drw['remarks'] ?? '-') ?></small>
+                                    <small class="text-muted d-block text-wrap" style="max-width: 250px;"><?= e($drw['remarks'] ?? '-') ?></small>
                                 </td>
                                 <td>
                                     <span class="badge text-uppercase <?= $typeClass ?>" style="font-size:0.7rem; letter-spacing: 0.5px;">
