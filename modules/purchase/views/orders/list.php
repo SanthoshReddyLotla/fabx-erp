@@ -47,6 +47,7 @@
                         <th>Delivery Date</th>
                         <th>Prepared By</th>
                         <th class="text-center">Status</th>
+                        <th class="actions text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,10 +94,15 @@
                                 <td class="text-center">
                                     <span class="badge-fx <?= $sc ?>"><?= ucfirst($po['status'] ?? '') ?></span>
                                 </td>
+                                <td class="actions text-end">
+                                    <a href="<?= base_url('purchase/orders/print/' . $po['id']) ?>" target="_blank" class="btn btn-sm btn-light" title="Print / PDF">
+                                        <i class="bi bi-printer"></i>
+                                    </a>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="10">
+                        <tr><td colspan="11">
                             <div class="empty-state">
                                 <i class="bi bi-bag-check"></i>
                                 <h5>No purchase orders found</h5>

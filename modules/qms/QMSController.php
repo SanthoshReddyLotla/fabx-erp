@@ -311,6 +311,34 @@ $sql = "SELECT d.*, dc.name as category_name, CONCAT(u.first_name, ' ', u.last_n
         ]);
     }
 
+    public function printNCR($id = null): void {
+        $this->requireCan('read');
+        $id = (int)($id ?: input('id'));
+
+        $ncr = $this->db->fetchOne(
+            "SELECT n.*, CONCAT(u.first_name, ' ', u.last_name) as reported_by_name,
+                    CONCAT(r.first_name, ' ', r.last_name) as responsible_name,
+                    CONCAT(v.first_name, ' ', v.last_name) as verified_by_name,
+                    d.name as department_name, p.project_name
+             FROM " . $this->db->table("ncr") . " n
+             LEFT JOIN " . $this->db->table("users") . " u ON n.reported_by = u.id
+             LEFT JOIN " . $this->db->table("users") . " r ON n.responsible_person = r.id
+             LEFT JOIN " . $this->db->table("users") . " v ON n.verified_by = v.id
+             LEFT JOIN " . $this->db->table("departments") . " d ON n.department_id = d.id
+             LEFT JOIN " . $this->db->table("projects") . " p ON n.project_id = p.id
+             WHERE n.id = ?",
+            [$id]
+        );
+        if (!$ncr) {
+            $this->flash('error', 'NCR not found.');
+            $this->redirect('/qms/ncr');
+        }
+
+        $this->printView('ncr/print', 'NCR ' . $ncr['ncr_no'], [
+            'ncr' => $ncr
+        ]);
+    }
+
     // ==================== CAPA ====================
 
     public function capa(): void {

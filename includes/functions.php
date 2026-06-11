@@ -385,6 +385,39 @@ function send_email(string $to, string $subject, string $htmlBody): bool {
 }
 
 /**
+ * Convert an amount to words using the Indian numbering system
+ * e.g. 125000.50 -> "Rupees One Lakh Twenty Five Thousand and Fifty Paise Only"
+ */
+function amount_in_words(float $amount): string {
+    $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+        'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    $twoDigits = function (int $n) use ($ones, $tens): string {
+        if ($n < 20) return $ones[$n];
+        return trim($tens[intdiv($n, 10)] . ' ' . $ones[$n % 10]);
+    };
+
+    $convert = function (int $n) use (&$convert, $twoDigits): string {
+        if ($n == 0) return '';
+        if ($n < 100) return $twoDigits($n);
+        if ($n < 1000) return trim($twoDigits(intdiv($n, 100)) . ' Hundred ' . $convert($n % 100));
+        if ($n < 100000) return trim($convert(intdiv($n, 1000)) . ' Thousand ' . $convert($n % 1000));
+        if ($n < 10000000) return trim($convert(intdiv($n, 100000)) . ' Lakh ' . $convert($n % 100000));
+        return trim($convert(intdiv($n, 10000000)) . ' Crore ' . $convert($n % 10000000));
+    };
+
+    $rupees = (int)floor(abs($amount));
+    $paise = (int)round((abs($amount) - $rupees) * 100);
+
+    $out = 'Rupees ' . ($rupees > 0 ? $convert($rupees) : 'Zero');
+    if ($paise > 0) {
+        $out .= ' and ' . $convert($paise) . ' Paise';
+    }
+    return preg_replace('/\s+/', ' ', $out) . ' Only';
+}
+
+/**
  * Calculate GST
  */
 function calculate_gst(float $amount, float $rate = DEFAULT_GST_RATE): array {
@@ -588,8 +621,9 @@ function status_badge(string $status): string {
     
     $class = $badges[strtolower($status)] ?? 'secondary';
     $label = ucwords(str_replace('_', ' ', $status));
-    
-    return '<span class="badge bg-' . $class . '">' . $label . '</span>';
+
+    // text-bg-* picks a contrasting text color automatically (BS 5.3)
+    return '<span class="badge text-bg-' . $class . '">' . $label . '</span>';
 }
 
 /**
@@ -605,7 +639,7 @@ function priority_badge(string $priority): string {
     ];
     
     $class = $badges[strtolower($priority)] ?? 'secondary';
-    return '<span class="badge bg-' . $class . '">' . ucfirst($priority) . '</span>';
+    return '<span class="badge text-bg-' . $class . '">' . ucfirst($priority) . '</span>';
 }
 
 /**

@@ -404,6 +404,61 @@ class AccountsController extends Controller {
         ]);
     }
 
+    public function printInvoice($id = null): void {
+        $this->requireCan('read');
+        $id = (int)($id ?: input('id'));
+
+        $invoice = $this->db->fetchOne(
+            "SELECT i.*,
+                    c.company_name as client_name, c.gstin as client_gstin, c.address as client_address,
+                    p.project_name, p.project_code
+             FROM " . $this->db->table("invoices") . " i
+             INNER JOIN " . $this->db->table("clients") . " c ON i.client_id = c.id
+             LEFT JOIN " . $this->db->table("projects") . " p ON i.project_id = p.id
+             WHERE i.id = ?",
+            [$id]
+        );
+        if (!$invoice) {
+            $this->flash('error', 'Invoice not found.');
+            $this->redirect('/accounts/invoices');
+        }
+
+        $items = $this->db->fetchAll(
+            "SELECT * FROM " . $this->db->table("invoice_items") . " WHERE invoice_id = ? ORDER BY sr_no ASC",
+            [$id]
+        );
+
+        $this->printView('invoices/print', 'Invoice ' . $invoice['invoice_no'], [
+            'invoice' => $invoice,
+            'items' => $items
+        ]);
+    }
+
+    public function printReceipt($id = null): void {
+        $this->requireCan('read');
+        $id = (int)($id ?: input('id'));
+
+        $payment = $this->db->fetchOne(
+            "SELECT p.*, c.company_name as client_name, c.address as client_address, c.gstin as client_gstin,
+                    i.invoice_no, i.grand_total as invoice_total, i.paid_amount as invoice_paid,
+                    CONCAT(u.first_name, ' ', u.last_name) as received_by_name
+             FROM " . $this->db->table("payments") . " p
+             LEFT JOIN " . $this->db->table("clients") . " c ON p.client_id = c.id
+             LEFT JOIN " . $this->db->table("invoices") . " i ON p.invoice_id = i.id
+             LEFT JOIN " . $this->db->table("users") . " u ON p.received_by = u.id
+             WHERE p.id = ?",
+            [$id]
+        );
+        if (!$payment) {
+            $this->flash('error', 'Payment not found.');
+            $this->redirect('/accounts/payments');
+        }
+
+        $this->printView('payments/print', 'Receipt ' . $payment['receipt_no'], [
+            'payment' => $payment
+        ]);
+    }
+
     public function editInvoice($id = null): void {
         $this->requireCan('update');
         if (!$id) {

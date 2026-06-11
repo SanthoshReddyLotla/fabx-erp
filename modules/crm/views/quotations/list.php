@@ -20,6 +20,7 @@
                         <th>Amount</th>
                         <th>Status</th>
                         <th>Created Date</th>
+                        <th class="actions text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,11 +55,16 @@
                                 <td>
                                     <?= format_date($q['created_at']) ?>
                                 </td>
+                                <td class="actions text-end">
+                                    <a href="<?= base_url('crm/quotations/print/' . $q['id']) ?>" target="_blank" class="btn btn-sm btn-light" title="Print / PDF">
+                                        <i class="bi bi-printer"></i>
+                                    </a>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="empty-state">
                                     <i class="bi bi-file-text"></i>
                                     <h5>No quotations found</h5>

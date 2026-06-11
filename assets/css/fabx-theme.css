@@ -1072,12 +1072,24 @@ a:hover { color: var(--info); opacity: 0.85; }
    PRINT STYLES
    ======================================== */
 @media print {
-    .sidebar, .top-navbar, .main-footer, .btn, .actions {
+    .sidebar, .top-navbar, .main-footer, .btn, .actions,
+    .sidebar-overlay, .page-actions, .print-btn, .scroll-top, .pagination {
         display: none !important;
     }
     .main-wrapper { margin-left: 0 !important; }
     .main-content { padding: 0; }
+    /* Force light, high-contrast output regardless of the active theme */
+    body, .fx-card, .card, .modal-content {
+        background: #fff !important;
+        color: #000 !important;
+    }
     .fx-card { border: 1px solid #ddd !important; box-shadow: none !important; }
+    .fx-table td, .fx-table th, .table td, .table th,
+    h1, h2, h3, h4, h5, h6, p, span, strong, td, th, div {
+        color: #000 !important;
+    }
+    .text-muted, .text-secondary { color: #555 !important; }
+    .badge, .badge-fx { border: 1px solid #999 !important; background: #fff !important; color: #000 !important; }
 }
 
 /* ========================================

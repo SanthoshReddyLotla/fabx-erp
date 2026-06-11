@@ -32,6 +32,7 @@
                         <th>Net Amount</th>
                         <th>Payment Mode</th>
                         <th>Txn Ref / Date</th>
+                        <th class="actions text-end">Receipt</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -75,11 +76,16 @@
                                     <div class="small text-light-heading"><?= e($p['transaction_ref'] ?? 'Direct Entry') ?></div>
                                     <small class="text-muted d-block" style="font-size:0.7rem;"><i class="bi bi-calendar-event me-1"></i><?= format_date($p['receipt_date']) ?></small>
                                 </td>
+                                <td class="actions text-end">
+                                    <a href="<?= base_url('accounts/payments/print/' . $p['id']) ?>" target="_blank" class="btn btn-sm btn-light" title="Print Receipt">
+                                        <i class="bi bi-printer"></i>
+                                    </a>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8">
+                            <td colspan="9">
                                 <div class="empty-state py-5">
                                     <i class="bi bi-cash-stack display-4 mb-3 d-block text-muted"></i>
                                     <h5>No Client Payments Recorded</h5>

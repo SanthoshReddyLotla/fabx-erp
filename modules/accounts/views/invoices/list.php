@@ -61,6 +61,7 @@
                                 <td class="actions text-end pe-3">
                                     <div class="d-flex gap-1 justify-content-end">
                                         <a href="<?= base_url('accounts/invoices/view/' . $inv['id']) ?>" class="btn btn-sm btn-light" title="View"><i class="bi bi-eye"></i></a>
+                                        <a href="<?= base_url('accounts/invoices/print/' . $inv['id']) ?>" target="_blank" class="btn btn-sm btn-light" title="Print / PDF"><i class="bi bi-printer"></i></a>
                                         <?php if (($inv['status'] ?? '') === 'draft'): ?>
                                             <a href="<?= base_url('accounts/invoices/edit/' . $inv['id']) ?>" class="btn btn-sm btn-light" title="Edit"><i class="bi bi-pencil"></i></a>
                                         <?php endif; ?>

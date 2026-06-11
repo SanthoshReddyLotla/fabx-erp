@@ -48,6 +48,15 @@
          * Initialize all charts on page
          */
         init: function() {
+            // Follow the active theme so axis labels/grids stay readable in dark mode
+            const dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+            this.defaults.gridColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+            this.defaults.textColor = dark ? '#cbd5e1' : '#64748b';
+            if (typeof Chart !== 'undefined') {
+                Chart.defaults.color = this.defaults.textColor;
+                Chart.defaults.borderColor = this.defaults.gridColor;
+            }
+
             this.initRevenueChart();
             this.initProductionChart();
             this.initQualityChart();

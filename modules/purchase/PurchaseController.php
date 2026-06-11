@@ -149,6 +149,38 @@ class PurchaseController extends Controller {
         ]);
     }
 
+    public function printOrder($id = null): void {
+        $this->requireCan('read');
+        $id = (int)($id ?: input('id'));
+
+        $order = $this->db->fetchOne(
+            "SELECT po.*, v.company_name as vendor_name, v.address as vendor_address, v.gstin as vendor_gstin,
+                    v.contact_person as vendor_contact, v.phone as vendor_phone,
+                    pr.pr_no,
+                    CONCAT(u.first_name, ' ', u.last_name) as prepared_by_name
+             FROM " . $this->db->table("purchase_orders") . " po
+             LEFT JOIN " . $this->db->table("vendors") . " v ON po.vendor_id = v.id
+             LEFT JOIN " . $this->db->table("purchase_requisitions") . " pr ON po.pr_id = pr.id
+             LEFT JOIN " . $this->db->table("users") . " u ON po.prepared_by = u.id
+             WHERE po.id = ?",
+            [$id]
+        );
+        if (!$order) {
+            $this->flash('error', 'Purchase order not found.');
+            $this->redirect('/purchase/orders');
+        }
+
+        $items = $this->db->fetchAll(
+            "SELECT * FROM " . $this->db->table("po_items") . " WHERE po_id = ? ORDER BY id ASC",
+            [$id]
+        );
+
+        $this->printView('orders/print', 'PO ' . $order['po_no'], [
+            'order' => $order,
+            'items' => $items
+        ]);
+    }
+
     // ==================== GRN ====================
 
     public function grn(): void {

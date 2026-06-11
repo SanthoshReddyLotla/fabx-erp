@@ -47,7 +47,7 @@ if (!function_exists('number_to_words')) {
 <div class="page-header d-print-none">
     <h1 class="page-title"><i class="bi bi-receipt text-primary"></i> Tax Invoice Details</h1>
     <div class="page-actions d-flex gap-2">
-        <button onclick="window.print()" class="btn btn-outline-secondary"><i class="bi bi-printer"></i> Print / Save PDF</button>
+        <a href="<?= base_url('accounts/invoices/print/' . $invoice['id']) ?>" target="_blank" class="btn btn-fx btn-fx-primary"><i class="bi bi-printer"></i> Print / Save PDF</a>
         <a href="<?= base_url('accounts/invoices') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to List</a>
     </div>
 </div>

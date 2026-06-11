@@ -70,6 +70,57 @@ class Controller {
     }
 
     /**
+     * Render a print-ready document (standalone A4 layout, no app chrome).
+     * The module print view supplies the document body; templates/print.php
+     * wraps it with the company letterhead, styling and print toolbar.
+     */
+    protected function printView(string $view, string $docTitle, array $data = []): void {
+        $data['company'] = $data['company'] ?? $this->companyProfile();
+        extract($data);
+
+        ob_start();
+        $viewFile = FABX_ROOT . '/modules/' . $this->module . '/views/' . $view . '.php';
+        if (file_exists($viewFile)) {
+            require $viewFile;
+        } else {
+            echo "<p>Print template not found: {$view}</p>";
+        }
+        $content = ob_get_clean();
+
+        $company = $data['company'];
+        $doc_title = $docTitle;
+        require FABX_ROOT . '/templates/print.php';
+        exit();
+    }
+
+    /**
+     * Company profile from settings, with config fallbacks
+     */
+    protected function companyProfile(): array {
+        $company = [
+            'company_name' => COMPANY_NAME,
+            'company_tagline' => COMPANY_TAGLINE,
+            'company_address' => COMPANY_ADDRESS,
+            'company_phone' => COMPANY_PHONE,
+            'company_email' => COMPANY_EMAIL,
+            'company_gstin' => COMPANY_GSTIN,
+        ];
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT setting_key, setting_value FROM " . $this->db->table("settings") . " WHERE setting_group = 'company'"
+            );
+            foreach ($rows as $row) {
+                if ($row['setting_value'] !== null && $row['setting_value'] !== '') {
+                    $company[$row['setting_key']] = $row['setting_value'];
+                }
+            }
+        } catch (\Exception $e) {
+            // fall back to config constants
+        }
+        return $company;
+    }
+
+    /**
      * Render partial view (no layout)
      */
     protected function partial(string $view, array $data = []): void {

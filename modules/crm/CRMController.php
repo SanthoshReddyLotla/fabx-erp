@@ -136,6 +136,35 @@ class CRMController extends Controller {
         ]);
     }
 
+    public function printQuotation($id = null): void {
+        $this->requireCan('read');
+        $id = (int)($id ?: input('id'));
+
+        $quotation = $this->db->fetchOne(
+            "SELECT q.*, c.company_name as client_name, c.address as client_address, c.gstin as client_gstin,
+                    CONCAT(u.first_name, ' ', u.last_name) as prepared_by_name
+             FROM " . $this->db->table("quotations") . " q
+             LEFT JOIN " . $this->db->table("clients") . " c ON q.client_id = c.id
+             LEFT JOIN " . $this->db->table("users") . " u ON q.prepared_by = u.id
+             WHERE q.id = ?",
+            [$id]
+        );
+        if (!$quotation) {
+            $this->flash('error', 'Quotation not found.');
+            $this->redirect('/crm/quotations');
+        }
+
+        $items = $this->db->fetchAll(
+            "SELECT * FROM " . $this->db->table("quotation_items") . " WHERE quotation_id = ? ORDER BY sr_no ASC",
+            [$id]
+        );
+
+        $this->printView('quotations/print', 'Quotation ' . $quotation['quotation_no'], [
+            'quotation' => $quotation,
+            'items' => $items
+        ]);
+    }
+
     // ==================== FOLLOW-UPS ====================
 
     public function followups(): void {

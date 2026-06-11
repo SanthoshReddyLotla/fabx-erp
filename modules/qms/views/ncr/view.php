@@ -9,6 +9,7 @@ $statusFlow = ['open','in_progress','pending_verification','closed'];
   <div class="page-actions">
     <span class="badge bg-<?= $severityClass ?> me-2"><?= ucfirst($ncr['severity']) ?></span>
     <?= status_badge($ncr['status']) ?>
+    <a href="<?= base_url('qms/ncr/print/' . $ncr['id']) ?>" target="_blank" class="btn btn-outline-secondary ms-2"><i class="bi bi-printer"></i> Print Report</a>
     <a href="<?= base_url('qms/ncr') ?>" class="btn btn-outline-secondary ms-2"><i class="bi bi-arrow-left"></i> Back</a>
   </div>
 </div>

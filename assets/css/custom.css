@@ -487,3 +487,87 @@
 .table-scroll::-webkit-scrollbar { height: 6px; }
 .table-scroll::-webkit-scrollbar-track { background: var(--bg-body); }
 .table-scroll::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+/* ============================================================
+   THEME READABILITY FIXES
+   A number of views hard-code dark-only utility classes
+   (bg-dark / text-white on form fields, text-dark on headings).
+   These rules remap those utilities to the active theme so text
+   is readable in BOTH light and dark modes, without editing
+   every view. Scoped to main/.modal so the standalone login
+   pages (which are intentionally dark) are unaffected.
+   ============================================================ */
+
+/* Form fields hard-coded dark -> follow the active theme */
+main .form-control.bg-dark,
+main .form-select.bg-dark,
+main .input-group-text.bg-dark,
+.modal .form-control.bg-dark,
+.modal .form-select.bg-dark,
+.modal .input-group-text.bg-dark {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+main .form-control.bg-dark::placeholder,
+.modal .form-control.bg-dark::placeholder {
+    color: var(--text-muted) !important;
+}
+main .form-control.bg-dark:focus,
+main .form-select.bg-dark:focus,
+.modal .form-control.bg-dark:focus,
+.modal .form-select.bg-dark:focus {
+    border-color: var(--info) !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+}
+
+/* Native select popups inherit the field color in some browsers;
+   pin options to theme colors so they are never white-on-white */
+main select option,
+.modal select option {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
+/* Hard-coded white text inside the app shell -> theme text color.
+   Elements that sit on a colored background (badges, buttons,
+   bg-* utilities) keep their explicit white. */
+main .text-white:not(.badge):not(.btn):not([class*="bg-"]):not(.nav-link),
+.modal .text-white:not(.badge):not(.btn):not([class*="bg-"]) {
+    color: var(--text-primary) !important;
+}
+main .nav-link.text-white:not(.active):not([class*="bg-"]) {
+    color: var(--text-secondary) !important;
+}
+
+/* Hard-coded dark text -> readable in dark mode */
+[data-bs-theme="dark"] main .text-dark:not(.badge):not(.btn):not([class*="bg-"]),
+[data-bs-theme="dark"] .modal .text-dark:not(.badge):not(.btn):not([class*="bg-"]) {
+    color: var(--text-primary) !important;
+}
+
+/* Badges that lost their contrast */
+.badge.bg-light { color: #1e293b !important; }
+.badge.bg-dark { color: #f1f5f9 !important; }
+.badge.bg-dark .text-muted, .badge.bg-dark.text-muted { color: #cbd5e1 !important; }
+
+/* Borders hard-coded for dark designs follow the theme */
+main .border-secondary,
+.modal .border-secondary {
+    border-color: var(--border-color) !important;
+}
+
+/* Tables hard-coded white text */
+main .table.text-white,
+main .table.text-white td,
+main .table.text-white th {
+    color: var(--text-primary) !important;
+}
+
+/* Cards hard-coded dark (invoice preview, info panels) follow the theme */
+main .fx-card.bg-dark,
+main .card.bg-dark,
+.modal .card.bg-dark {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}

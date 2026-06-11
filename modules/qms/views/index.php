@@ -92,7 +92,7 @@
                         <i class="bi bi-files fs-2 text-primary"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">Document Control</h5>
+                <h5>Document Control</h5>
                 <p class="text-muted small mb-0">Manage SOPs, work instructions, quality manual, forms & formats with version control and approval workflow.</p>
             </div>
         </a>
@@ -105,7 +105,7 @@
                         <i class="bi bi-exclamation-triangle fs-2 text-danger"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">NCR Management</h5>
+                <h5>NCR Management</h5>
                 <p class="text-muted small mb-0">Non-conformance reports, root cause analysis, corrective actions and verification tracking.</p>
             </div>
         </a>
@@ -118,7 +118,7 @@
                         <i class="bi bi-arrow-repeat fs-2 text-warning"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">CAPA</h5>
+                <h5>CAPA</h5>
                 <p class="text-muted small mb-0">Corrective and preventive actions with effectiveness verification and closure tracking.</p>
             </div>
         </a>
@@ -131,7 +131,7 @@
                         <i class="bi bi-clipboard-check fs-2" style="color:#9b59b6"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">Internal Audits</h5>
+                <h5>Internal Audits</h5>
                 <p class="text-muted small mb-0">Schedule audits, manage checklists, record findings and track closure of non-conformities.</p>
             </div>
         </a>
@@ -144,7 +144,7 @@
                         <i class="bi bi-thermometer fs-2" style="color:#e67e22"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">Calibration</h5>
+                <h5>Calibration</h5>
                 <p class="text-muted small mb-0">Track equipment calibration schedules, certificates and due date alerts.</p>
             </div>
         </a>
@@ -157,7 +157,7 @@
                         <i class="bi bi-mortarboard fs-2 text-success"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">Training Records</h5>
+                <h5>Training Records</h5>
                 <p class="text-muted small mb-0">Employee training management, competency matrix and certification tracking.</p>
             </div>
         </a>
@@ -170,7 +170,7 @@
                         <i class="bi bi-chat-left-text fs-2" style="color:#34495e"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">Complaints</h5>
+                <h5>Complaints</h5>
                 <p class="text-muted small mb-0">Customer complaint handling, investigation and resolution tracking.</p>
             </div>
         </a>
@@ -183,7 +183,7 @@
                         <i class="bi bi-diagram-3 fs-2 text-danger"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">Risk Assessment</h5>
+                <h5>Risk Assessment</h5>
                 <p class="text-muted small mb-0">Identify, assess and mitigate operational, quality and compliance risks.</p>
             </div>
         </a>
@@ -196,7 +196,7 @@
                         <i class="bi bi-bar-chart fs-2 text-primary"></i>
                     </div>
                 </div>
-                <h5 class="text-dark">KPI & Objectives</h5>
+                <h5>KPI & Objectives</h5>
                 <p class="text-muted small mb-0">Track quality objectives, KPIs and management review action items.</p>
             </div>
         </a>
