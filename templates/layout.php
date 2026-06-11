@@ -19,8 +19,10 @@
     <!-- Select2 -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     
-    <link href="<?= asset('css/fabx-theme.css') ?>" rel="stylesheet">
-    <link href="<?= asset('css/custom.css') ?>" rel="stylesheet">
+    <?php /* filemtime cache-busting: browsers pick up CSS/JS changes immediately
+             despite the long-lived Expires headers set in .htaccess */ ?>
+    <link href="<?= asset('css/fabx-theme.css') ?>?v=<?= @filemtime(FABX_ROOT . '/assets/css/fabx-theme.css') ?>" rel="stylesheet">
+    <link href="<?= asset('css/custom.css') ?>?v=<?= @filemtime(FABX_ROOT . '/assets/css/custom.css') ?>" rel="stylesheet">
     
     <?= $extra_css ?? '' ?>
 </head>
@@ -71,8 +73,8 @@
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
-    <script src="<?= asset('js/fabx-app.js') ?>"></script>
-    <script src="<?= asset('js/charts.js') ?>"></script>
+    <script src="<?= asset('js/fabx-app.js') ?>?v=<?= @filemtime(FABX_ROOT . '/assets/js/fabx-app.js') ?>"></script>
+    <script src="<?= asset('js/charts.js') ?>?v=<?= @filemtime(FABX_ROOT . '/assets/js/charts.js') ?>"></script>
     
     <?= $extra_js ?? '' ?>
 </body>

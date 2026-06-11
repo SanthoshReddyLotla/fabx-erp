@@ -391,13 +391,8 @@ class AccountsController extends Controller {
             [$id]
         );
         
-        // Fetch company profile settings
-        $settingsRows = $this->db->fetchAll("SELECT setting_key, setting_value FROM " . $this->db->table("settings") . " WHERE setting_group = 'company'");
-        $company = [];
-        foreach ($settingsRows as $row) {
-            $company[$row['setting_key']] = $row['setting_value'];
-        }
-        
+        $company = $this->companyProfile();
+
         $this->view('invoices/view', [
             'page_title' => 'Invoice ' . $invoice['invoice_no'], 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Invoice Details',
             'invoice' => $invoice, 'items' => $items, 'company' => $company
