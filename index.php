@@ -1,9 +1,4 @@
 <?php
-
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-
 /**
  * FabX Engineering ERP - Front Controller
  * Single entry point - Routes all requests to appropriate controllers
@@ -190,6 +185,11 @@ if (!$route) {
             break;
         }
     }
+}
+
+// Restore session from remember-me cookie if present
+if (!is_logged_in()) {
+    attempt_remember_login();
 }
 
 // Default to dashboard if no route found

@@ -50,10 +50,10 @@ class AuthController extends Controller {
         }
 
         $email = input('email');
-        $password = input('password');
+        $password = (string)input_raw('password', '');
         $remember = isset($_POST['remember']);
 
-        if (empty($email) || empty($password)) {
+        if (empty($email) || $password === '') {
             $this->flash('error', 'Please enter both email and password.');
             $this->redirect('/auth/login');
         }
@@ -66,7 +66,7 @@ class AuthController extends Controller {
         }
 
         $user = $this->db->fetchOne(
-            "SELECT u.*, r.name as role_name, r.permissions, d.name as department_name 
+            "SELECT u.*, r.name as role_name, r.permissions, d.name as department_name
              FROM " . $this->db->table("users") . " u
              LEFT JOIN " . $this->db->table("roles") . " r ON u.role_id = r.id
              LEFT JOIN " . $this->db->table("departments") . " d ON u.department_id = d.id
@@ -74,20 +74,27 @@ class AuthController extends Controller {
             [$email]
         );
 
+        // Check the lock before verifying the password so a locked account
+        // cannot be brute-forced at all.
+        if ($user && (int)$user['failed_attempts'] >= MAX_FAILED_LOGINS
+            && $user['locked_until'] && strtotime($user['locked_until']) > time()) {
+            $this->flash('error', 'Account is temporarily locked due to repeated failed logins. Try again later or contact admin.');
+            log_security_event('LOCKED_LOGIN_ATTEMPT', "Email: $email");
+            $this->redirect('/auth/login');
+        }
+
         if (!$user || !verify_password($password, $user['password'])) {
+            if ($user) {
+                $this->recordFailedAttempt((int)$user['id'], (int)$user['failed_attempts']);
+            }
             $this->flash('error', 'Invalid email or password.');
             log_security_event('FAILED_LOGIN', "Email: $email, IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
             $this->redirect('/auth/login');
         }
 
-        // Check if account is locked
-        if ($user['failed_attempts'] >= 5 && $user['locked_until'] && strtotime($user['locked_until']) > time()) {
-            $this->flash('error', 'Account is temporarily locked. Please try again later or contact admin.');
-            $this->redirect('/auth/login');
-        }
-
         // Successful login
         $this->resetFailedAttempts($user['id']);
+        session_regenerate_id(true);
 
         // Set session
         $_SESSION['user_id'] = (int)$user['id'];
@@ -102,14 +109,15 @@ class AuthController extends Controller {
         $_SESSION['last_activity'] = time();
         $_SESSION['login_time'] = time();
 
-        // Remember me
+        // Remember me: cookie holds the raw token, DB stores its hash
         if ($remember) {
-            $token = generate_token(32);
+            $token = generate_token(64);
             $this->db->execute(
                 "UPDATE " . $this->db->table("users") . " SET remember_token = ? WHERE id = ?",
-                [$token, $user['id']]
+                [hash('sha256', $token), $user['id']]
             );
-            setcookie('remember_me', $token, time() + 86400 * 30, '/', '', false, true);
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            setcookie('remember_me', $token, time() + 86400 * 30, '/', '', $secure, true);
         }
 
         // Log activity
@@ -139,10 +147,12 @@ class AuthController extends Controller {
         
         // Log activity
         log_activity('LOGOUT', 'User logged out', $userId);
-        
-        // Destroy session
+
+        // Destroy session, then start a clean one so the flash message survives
         session_destroy();
-        
+        session_start();
+        session_regenerate_id(true);
+
         $this->flash('info', 'You have been logged out successfully.');
         $this->redirect('/auth/login');
     }
@@ -183,18 +193,23 @@ class AuthController extends Controller {
         if ($user) {
             $token = generate_token(32);
             $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
-            
+
             $this->db->execute(
-                "UPDATE " . $this->db->table("users") . " 
+                "UPDATE " . $this->db->table("users") . "
                  SET reset_token = ?, reset_expires = ? WHERE id = ?",
                 [$token, $expires, $user['id']]
             );
 
-            // In production, send email with reset link
-            // For now, store in session for demo
-            $_SESSION['reset_token_demo'] = $token;
-            $_SESSION['reset_email_demo'] = $email;
-            
+            $resetLink = base_url('auth/reset-password?token=' . urlencode($token));
+            send_email(
+                $email,
+                APP_NAME . ' - Password Reset',
+                "<p>Hello " . e($user['first_name']) . ",</p>" .
+                "<p>A password reset was requested for your account. The link below is valid for 1 hour:</p>" .
+                "<p><a href=\"{$resetLink}\">{$resetLink}</a></p>" .
+                "<p>If you did not request this, you can ignore this email.</p>"
+            );
+
             log_activity('PASSWORD_RESET_REQUEST', "Reset requested for: $email", $user['id']);
         }
 
@@ -246,10 +261,10 @@ class AuthController extends Controller {
         }
 
         $token = input('token');
-        $password = input('password');
-        $confirmPassword = input('confirm_password');
+        $password = (string)input_raw('password', '');
+        $confirmPassword = (string)input_raw('confirm_password', '');
 
-        if (empty($token) || empty($password) || empty($confirmPassword)) {
+        if (empty($token) || $password === '' || $confirmPassword === '') {
             $this->flash('error', 'All fields are required.');
             $this->redirect('/auth/reset-password?token=' . urlencode($token));
         }
@@ -324,8 +339,8 @@ class AuthController extends Controller {
         $firstName = input('first_name');
         $lastName = input('last_name');
         $phone = input('phone');
-        $currentPassword = input('current_password');
-        $newPassword = input('new_password');
+        $currentPassword = (string)input_raw('current_password', '');
+        $newPassword = (string)input_raw('new_password', '');
 
         if (empty($firstName) || empty($lastName)) {
             $this->json(false, 'First name and last name are required.');
@@ -358,13 +373,17 @@ class AuthController extends Controller {
         }
 
         // Password change
-        if (!empty($newPassword)) {
+        if ($newPassword !== '') {
+            if ($currentPassword === '') {
+                $this->json(false, 'Please enter your current password to set a new one.');
+            }
+
             $user = $this->db->fetchOne(
                 "SELECT password FROM " . $this->db->table("users") . " WHERE id = ?",
                 [$userId]
             );
 
-            if (!verify_password($currentPassword, $user['password'])) {
+            if (!$user || !verify_password($currentPassword, $user['password'])) {
                 $this->json(false, 'Current password is incorrect.');
             }
 
@@ -414,9 +433,10 @@ class AuthController extends Controller {
      */
     public function heartbeat(): void {
         if (is_logged_in()) {
+            $idle = time() - ($_SESSION['last_activity'] ?? time());
             $_SESSION['last_activity'] = time();
             $this->json(true, 'Session active', [
-                'session_remaining' => SESSION_TIMEOUT - (time() - $_SESSION['last_activity'])
+                'session_remaining' => max(0, SESSION_TIMEOUT - $idle)
             ]);
         }
         $this->json(false, 'Not authenticated');
@@ -427,10 +447,31 @@ class AuthController extends Controller {
      */
     private function resetFailedAttempts(int $userId): void {
         $this->db->execute(
-            "UPDATE " . $this->db->table("users") . " 
-             SET failed_attempts = 0, locked_until = NULL, last_login = NOW() 
+            "UPDATE " . $this->db->table("users") . "
+             SET failed_attempts = 0, locked_until = NULL, last_login = NOW()
              WHERE id = ?",
             [$userId]
         );
+    }
+
+    /**
+     * Record a failed login attempt; lock the account once the limit is hit
+     */
+    private function recordFailedAttempt(int $userId, int $currentAttempts): void {
+        $attempts = $currentAttempts + 1;
+        if ($attempts >= MAX_FAILED_LOGINS) {
+            $this->db->execute(
+                "UPDATE " . $this->db->table("users") . "
+                 SET failed_attempts = ?, locked_until = DATE_ADD(NOW(), INTERVAL " . (int)LOCKOUT_MINUTES . " MINUTE)
+                 WHERE id = ?",
+                [$attempts, $userId]
+            );
+            log_security_event('ACCOUNT_LOCKED', "User #{$userId} locked after {$attempts} failed attempts");
+        } else {
+            $this->db->execute(
+                "UPDATE " . $this->db->table("users") . " SET failed_attempts = ? WHERE id = ?",
+                [$attempts, $userId]
+            );
+        }
     }
 }

@@ -110,25 +110,42 @@ function generate_token(int $length = 32): string {
 }
 
 /**
- * Verify file upload security
+ * Verify file upload security: the detected MIME type must be plausible
+ * for the claimed extension. CAD/exchange formats (dwg, dxf, step, iges)
+ * have no registered MIME type and commonly detect as octet-stream/text.
  */
-function verify_upload_security(array $file): bool {
+function verify_upload_security(array $file, ?string $ext = null): bool {
+    if (!is_uploaded_file($file['tmp_name'] ?? '')) {
+        return false;
+    }
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
     $mimeType = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
-    
-    $allowedMimes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'image/jpeg',
-        'image/png',
-        'image/jpg'
+
+    $ext = strtolower($ext ?? pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+
+    $mimeMap = [
+        'pdf'  => ['application/pdf'],
+        'doc'  => ['application/msword', 'application/vnd.ms-office'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+        'xls'  => ['application/vnd.ms-excel', 'application/vnd.ms-office'],
+        'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'],
+        'jpg'  => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png'  => ['image/png'],
+        'dwg'  => ['application/octet-stream', 'image/vnd.dwg', 'application/acad'],
+        'dxf'  => ['application/octet-stream', 'image/vnd.dxf', 'text/plain'],
+        'step' => ['application/octet-stream', 'text/plain', 'application/step'],
+        'iges' => ['application/octet-stream', 'text/plain', 'application/iges'],
     ];
-    
-    return in_array($mimeType, $allowedMimes);
+
+    // Never accept anything that smells like executable script
+    $blocked = ['text/x-php', 'application/x-php', 'application/x-httpd-php', 'text/html', 'application/javascript', 'text/javascript'];
+    if (in_array($mimeType, $blocked, true)) {
+        return false;
+    }
+
+    return isset($mimeMap[$ext]) && in_array($mimeType, $mimeMap[$ext], true);
 }
 
 /**
@@ -163,6 +180,47 @@ function require_permission(string $permission): void {
 }
 
 /**
+ * Try to restore a session from the remember-me cookie.
+ * The cookie holds the raw token; the database stores its SHA-256 hash.
+ */
+function attempt_remember_login(): bool {
+    if (is_logged_in() || empty($_COOKIE['remember_me'])) {
+        return is_logged_in();
+    }
+    try {
+        $db = Core\Database::getInstance();
+        $user = $db->fetchOne(
+            "SELECT u.*, r.name as role_name, r.permissions, d.name as department_name
+             FROM " . DB_PREFIX . "users u
+             LEFT JOIN " . DB_PREFIX . "roles r ON u.role_id = r.id
+             LEFT JOIN " . DB_PREFIX . "departments d ON u.department_id = d.id
+             WHERE u.remember_token = ? AND u.status = 'active' AND u.is_deleted = 0",
+            [hash('sha256', $_COOKIE['remember_me'])]
+        );
+        if (!$user) {
+            setcookie('remember_me', '', time() - 3600, '/', '', false, true);
+            return false;
+        }
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = (int)$user['id'];
+        $_SESSION['user_name'] = $user['first_name'] . ' ' . $user['last_name'];
+        $_SESSION['user_email'] = $user['email'];
+        $_SESSION['user_role'] = $user['role_name'];
+        $_SESSION['user_role_id'] = (int)$user['role_id'];
+        $_SESSION['user_department'] = $user['department_name'];
+        $_SESSION['user_department_id'] = (int)$user['department_id'];
+        $_SESSION['user_avatar'] = $user['avatar'] ?? '';
+        $_SESSION['user_permissions'] = json_decode($user['permissions'] ?? '[]', true);
+        $_SESSION['last_activity'] = time();
+        $_SESSION['login_time'] = time();
+        log_activity('LOGIN', 'Session restored via remember-me cookie', (int)$user['id']);
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
  * Require authentication
  */
 function require_auth(): void {
@@ -181,7 +239,7 @@ function set_security_headers(): void {
     header('X-Content-Type-Options: nosniff');
     header('X-XSS-Protection: 1; mode=block');
     header('Referrer-Policy: strict-origin-when-cross-origin');
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com fonts.googleapis.com; font-src 'self' fonts.gstatic.com cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none';");
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com fonts.googleapis.com; font-src 'self' fonts.gstatic.com cdn.jsdelivr.net cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none';");
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
     
     if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
