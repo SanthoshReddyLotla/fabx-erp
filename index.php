@@ -133,6 +133,7 @@ $routes = [
     'accounts/invoices/create' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'createInvoice', 'auth' => true],
     'accounts/invoices/view' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'viewInvoice', 'auth' => true],
     'accounts/invoices/edit' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'editInvoice', 'auth' => true],
+    'accounts/invoices/markAsSent' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'markAsSent', 'auth' => true],
     'accounts/invoices/markAsPaid' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'markAsPaid', 'auth' => true],
     'accounts/invoices/delete' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'deleteInvoice', 'auth' => true],
     'accounts/invoices/print' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'printInvoice', 'auth' => true],

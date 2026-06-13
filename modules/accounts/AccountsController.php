@@ -166,39 +166,65 @@ class AccountsController extends Controller {
             $paymentMode = input('payment_mode');
             $receiptNo = input('receipt_no');
             $transactionRef = input('transaction_ref');
-            $paymentDate = input('payment_date');
-            
-            if (!$receiptNo) {
-                $receiptNo = 'REC-' . date('Ymd') . '-' . rand(1000, 9999);
+            $paymentDate = input('payment_date') ?: date('Y-m-d');
+
+            // Validation
+            if ($amount <= 0) {
+                $this->flash('error', 'Payment amount must be greater than zero.');
+                $this->redirect('/accounts/payments');
             }
-            
+            if ($tdsAmount < 0 || $tdsAmount > $amount) {
+                $this->flash('error', 'TDS amount cannot be negative or exceed the payment amount.');
+                $this->redirect('/accounts/payments');
+            }
+
+            // If an invoice is selected, trust the invoice's own client so the
+            // payment can never be filed against the wrong party's ledger.
+            $invoice = $invoiceId
+                ? $this->db->fetchOne("SELECT id, client_id, grand_total, paid_amount, status FROM " . $this->db->table("invoices") . " WHERE id = ?", [$invoiceId])
+                : null;
+            if ($invoice) {
+                $clientId = (int)$invoice['client_id'];
+            }
+            if (!$clientId) {
+                $this->flash('error', 'Please select a client (or an invoice) for this payment.');
+                $this->redirect('/accounts/payments');
+            }
+
+            if (!$receiptNo) {
+                $receiptNo = 'REC-' . date('Ymd') . '-' . code_suffix(4);
+            }
+
             $this->db->beginTransaction();
             try {
                 // 1. Insert Payment
                 $this->db->insert(
-                    "INSERT INTO " . $this->db->table("payments") . " 
+                    "INSERT INTO " . $this->db->table("payments") . "
                     (receipt_no, receipt_date, invoice_id, client_id, amount, tds_amount, net_amount, payment_mode, transaction_ref, transaction_date, received_by, remarks, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
-                    [$receiptNo, $paymentDate, $invoiceId, $clientId, $amount, $tdsAmount, $netAmount, $paymentMode, $transactionRef, $paymentDate, current_user_id(), input('remarks')]
+                    [$receiptNo, $paymentDate, $invoiceId ?: null, $clientId, $amount, $tdsAmount, $netAmount, $paymentMode, $transactionRef, $paymentDate, current_user_id(), input('remarks')]
                 );
-                
-                // 2. Real-Time Invoice Update
-                $invoice = $this->db->fetchOne("SELECT grand_total, paid_amount FROM " . $this->db->table("invoices") . " WHERE id = ?", [$invoiceId]);
+
+                // 2. Settle the invoice. The full gross amount (including any TDS
+                // withheld by the client) discharges the receivable - TDS is
+                // remitted to the tax authority on our behalf, so it still counts
+                // as settled. Using net here would leave TDS invoices permanently
+                // stuck at 'partial'.
                 if ($invoice) {
-                    $newPaidAmount = (float)$invoice['paid_amount'] + $netAmount;
-                    $status = ($newPaidAmount >= (float)$invoice['grand_total']) ? 'paid' : 'partial';
-                    
+                    $newPaidAmount = round((float)$invoice['paid_amount'] + $amount, 2);
+                    $status = ($newPaidAmount >= (float)$invoice['grand_total'] - 0.01) ? 'paid' : 'partial';
+
                     $this->db->execute(
-                        "UPDATE " . $this->db->table("invoices") . " 
+                        "UPDATE " . $this->db->table("invoices") . "
                          SET paid_amount = ?, status = ?, paid_date = ?
                          WHERE id = ?",
                         [$newPaidAmount, $status, $paymentDate, $invoiceId]
                     );
                 }
-                
+
                 $this->db->commit();
-                $this->log('PAYMENT_RECEIVED', "Payment receipt {$receiptNo} recorded for invoice ID {$invoiceId}");
-                $this->flash('success', "Payment of ₹" . number_format($amount, 2) . " received successfully.");
+                $this->log('PAYMENT_RECEIVED', "Payment receipt {$receiptNo} recorded" . ($invoiceId ? " for invoice ID {$invoiceId}" : ' (on account)'));
+                $this->flash('success', "Payment of " . format_currency($amount) . " received successfully (receipt {$receiptNo}).");
             } catch (\Exception $e) {
                 $this->db->rollback();
                 $this->flash('error', 'Failed to process payment entry: ' . $e->getMessage());
@@ -218,8 +244,12 @@ class AccountsController extends Controller {
         $total = (int)$this->db->fetchValue("SELECT COUNT(*) FROM " . $this->db->table("payments"));
         
         $clients = $this->db->fetchAll("SELECT id, company_name FROM " . $this->db->table("clients") . " WHERE status = 'active'");
-        $invoices = $this->db->fetchAll("SELECT id, invoice_no, grand_total, paid_amount, client_id FROM " . $this->db->table("invoices") . " WHERE status IN ('sent','partial','overdue')");
-        
+        // Any non-cancelled invoice that still has a balance can take a payment.
+        $invoices = $this->db->fetchAll(
+            "SELECT id, invoice_no, grand_total, paid_amount, client_id FROM " . $this->db->table("invoices") . "
+             WHERE status NOT IN ('paid','cancelled') ORDER BY invoice_no DESC"
+        );
+
         $this->view('payments/list', [
             'page_title' => 'Payments', 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Payments',
             'payments' => $payments, 'pagination' => paginate($total, $page),
@@ -330,21 +360,23 @@ class AccountsController extends Controller {
         
         if ($entityType && $entityId) {
             if ($entityType === 'client') {
+                // Only issued invoices are receivables: drafts are work-in-progress
+                // and cancelled invoices are void, so neither belongs in the ledger.
                 $statements = $this->db->fetchAll(
-                    "SELECT 'invoice' as type, invoice_date as date, invoice_no as ref_no, 'Invoice Raised' as description, grand_total as debit, 0.00 as credit, created_at 
-                     FROM " . $this->db->table("invoices") . " WHERE client_id = ?
+                    "SELECT 'invoice' as type, invoice_date as date, invoice_no as ref_no, 'Invoice Raised' as description, grand_total as debit, 0.00 as credit, created_at
+                     FROM " . $this->db->table("invoices") . " WHERE client_id = ? AND status NOT IN ('draft','cancelled')
                      UNION ALL
-                     SELECT 'payment' as type, receipt_date as date, receipt_no as ref_no, CONCAT('Payment Mode: ', UPPER(payment_mode)) as description, 0.00 as debit, amount as credit, created_at 
+                     SELECT 'payment' as type, receipt_date as date, receipt_no as ref_no, CONCAT('Receipt - ', UPPER(payment_mode)) as description, 0.00 as debit, amount as credit, created_at
                      FROM " . $this->db->table("payments") . " WHERE client_id = ?
                      ORDER BY date ASC, created_at ASC",
                     [$entityId, $entityId]
                 );
             } elseif ($entityType === 'vendor') {
                 $statements = $this->db->fetchAll(
-                    "SELECT 'po' as type, po_date as date, po_no as ref_no, 'Purchase Order' as description, total_amount as debit, 0.00 as credit, created_at 
-                     FROM " . $this->db->table("purchase_orders") . " WHERE vendor_id = ?
+                    "SELECT 'po' as type, po_date as date, po_no as ref_no, 'Purchase Order' as description, total_amount as debit, 0.00 as credit, created_at
+                     FROM " . $this->db->table("purchase_orders") . " WHERE vendor_id = ? AND status NOT IN ('draft','cancelled')
                      UNION ALL
-                     SELECT 'payment' as type, payment_date as date, payment_no as ref_no, CONCAT('Payment Mode: ', UPPER(payment_mode)) as description, 0.00 as debit, amount as credit, created_at 
+                     SELECT 'payment' as type, payment_date as date, payment_no as ref_no, CONCAT('Payment - ', UPPER(payment_mode)) as description, 0.00 as debit, amount as credit, created_at
                      FROM " . $this->db->table("vendor_payments") . " WHERE vendor_id = ?
                      ORDER BY date ASC, created_at ASC",
                     [$entityId, $entityId]
@@ -585,11 +617,7 @@ class AccountsController extends Controller {
 
     public function markAsPaid($id = null): void {
         $this->requireCan('update');
-        if (!$id) {
-            $id = (int)input('id');
-        } else {
-            $id = (int)$id;
-        }
+        $id = (int)($id ?: input('id'));
 
         $invoice = $this->db->fetchOne("SELECT * FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
         if (!$invoice) {
@@ -597,24 +625,87 @@ class AccountsController extends Controller {
             $this->redirect('/accounts/invoices');
         }
 
+        if ($invoice['status'] === 'cancelled') {
+            $this->flash('error', 'A cancelled invoice cannot be marked as paid.');
+            $this->redirect('/accounts/invoices');
+        }
+
         $grandTotal = (float)$invoice['grand_total'];
-        
+        // Base the balance on payments actually recorded, not the paid_amount
+        // field. This self-heals invoices that were "marked paid" before
+        // receipts were generated: their paid_amount is set but no payment row
+        // exists, so the ledger never showed the credit.
+        $recordedPayments = (float)$this->db->fetchValue(
+            "SELECT COALESCE(SUM(amount), 0) FROM " . $this->db->table("payments") . " WHERE invoice_id = ?",
+            [$id]
+        );
+        $balance = round($grandTotal - $recordedPayments, 2);
+
+        if ($balance <= 0) {
+            // Make sure the invoice flags agree with the recorded payments
+            if ($invoice['status'] !== 'paid') {
+                $this->db->execute(
+                    "UPDATE " . $this->db->table("invoices") . " SET paid_amount = ?, status = 'paid', paid_date = CURDATE(), updated_at = NOW() WHERE id = ?",
+                    [$recordedPayments, $id]
+                );
+            }
+            $this->flash('info', "Invoice {$invoice['invoice_no']} is already fully settled.");
+            $this->redirect('/accounts/invoices');
+        }
+
         $this->db->beginTransaction();
         try {
+            // Record a payment receipt for the outstanding balance so the
+            // ledger, payments list and invoice all stay in agreement.
+            $receiptNo = 'REC-' . date('Ymd') . '-' . code_suffix(4);
+            $this->db->insert(
+                "INSERT INTO " . $this->db->table("payments") . "
+                (receipt_no, receipt_date, invoice_id, client_id, amount, tds_amount, net_amount, payment_mode, transaction_date, received_by, remarks, created_at)
+                VALUES (?, CURDATE(), ?, ?, ?, 0, ?, 'other', CURDATE(), ?, ?, NOW())",
+                [$receiptNo, $id, (int)$invoice['client_id'], $balance, $balance, current_user_id(), 'Invoice marked as fully paid']
+            );
+
             $this->db->execute(
-                "UPDATE " . $this->db->table("invoices") . " 
-                 SET paid_amount = ?, status = 'paid', paid_date = NOW(), updated_at = NOW() 
+                "UPDATE " . $this->db->table("invoices") . "
+                 SET paid_amount = ?, status = 'paid', paid_date = CURDATE(), updated_at = NOW()
                  WHERE id = ?",
                 [$grandTotal, $id]
             );
             $this->db->commit();
-            
-            $this->log('INVOICE_MARKED_PAID', "Invoice ID {$id} marked as fully paid");
-            $this->flash('success', "Invoice {$invoice['invoice_no']} has been marked as fully paid.");
+
+            $this->log('INVOICE_MARKED_PAID', "Invoice {$invoice['invoice_no']} settled via receipt {$receiptNo}");
+            $this->flash('success', "Invoice {$invoice['invoice_no']} marked as paid (receipt {$receiptNo} recorded).");
         } catch (\Exception $e) {
             $this->db->rollback();
             $this->flash('error', 'Failed to mark invoice as paid: ' . $e->getMessage());
         }
+        $this->redirect('/accounts/invoices');
+    }
+
+    /**
+     * Issue a draft invoice (draft -> sent) so it becomes a receivable and can
+     * accept payments. Without this, invoices were stranded in 'draft' forever.
+     */
+    public function markAsSent($id = null): void {
+        $this->requireCan('update');
+        $id = (int)($id ?: input('id'));
+
+        $invoice = $this->db->fetchOne("SELECT * FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
+        if (!$invoice) {
+            $this->flash('error', 'Invoice not found.');
+            $this->redirect('/accounts/invoices');
+        }
+        if ($invoice['status'] !== 'draft') {
+            $this->flash('info', 'Only draft invoices can be issued.');
+            $this->redirect('/accounts/invoices');
+        }
+
+        $this->db->execute(
+            "UPDATE " . $this->db->table("invoices") . " SET status = 'sent', updated_at = NOW() WHERE id = ?",
+            [$id]
+        );
+        $this->log('INVOICE_SENT', "Invoice {$invoice['invoice_no']} issued");
+        $this->flash('success', "Invoice {$invoice['invoice_no']} has been issued.");
         $this->redirect('/accounts/invoices');
     }
 
