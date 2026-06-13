@@ -69,7 +69,9 @@
                                         <?php if (!in_array($inv['status'] ?? '', ['paid', 'cancelled'])): ?>
                                             <a href="<?= base_url('accounts/invoices/markAsPaid/' . $inv['id']) ?>" class="btn btn-sm btn-light text-success" title="Mark Paid" onclick="return confirm('Mark this invoice as fully paid? A payment receipt for the outstanding balance will be recorded.');"><i class="bi bi-check-circle-fill"></i></a>
                                         <?php endif; ?>
-                                        <a href="<?= base_url('accounts/invoices/delete/' . $inv['id']) ?>" class="btn btn-sm btn-light text-danger" title="Delete" data-swal-confirm="Are you sure you want to delete this invoice? This action will completely remove all associated line items." onclick="return confirm('Are you sure you want to delete this invoice? This action will completely remove all associated line items.');"><i class="bi bi-trash-fill"></i></a>
+                                        <?php if (($inv['status'] ?? '') === 'draft'): ?>
+                                            <a href="<?= base_url('accounts/invoices/delete/' . $inv['id']) ?>" class="btn btn-sm btn-light text-danger" title="Delete draft" onclick="return confirm('Delete this draft invoice? This permanently removes it and its line items.');"><i class="bi bi-trash-fill"></i></a>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>

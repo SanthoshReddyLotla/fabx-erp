@@ -16,6 +16,48 @@ class AccountsController extends Controller {
         require_auth();
     }
 
+    /**
+     * Compute invoice line/tax totals from the submitted form, honouring the
+     * GST classification (intra/interstate) and the rates the user actually
+     * saw on screen. Shared by create and edit so the stored figures can never
+     * disagree with the on-screen summary the user confirmed.
+     */
+    private function computeInvoiceTotals(): array {
+        $items = $_POST['items'] ?? [];
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += ((float)($item['quantity'] ?? 0)) * ((float)($item['unit_rate'] ?? 0));
+        }
+        $subtotal = round($subtotal, 2);
+
+        $discount = max(0, (float)input('discount_amount', 0));
+        $taxable = round(max(0, $subtotal - $discount), 2);
+
+        $gstType = input('gst_type', 'intrastate');
+        $cgstRate = $sgstRate = $igstRate = 0.0;
+        $cgstAmt = $sgstAmt = $igstAmt = 0.0;
+
+        if ($gstType === 'interstate') {
+            $igstRate = max(0, (float)input('igst_rate', IGST_RATE));
+            $igstAmt = round($taxable * $igstRate / 100, 2);
+        } else {
+            $cgstRate = max(0, (float)input('cgst_rate', CGST_RATE));
+            $sgstRate = max(0, (float)input('sgst_rate', SGST_RATE));
+            $cgstAmt = round($taxable * $cgstRate / 100, 2);
+            $sgstAmt = round($taxable * $sgstRate / 100, 2);
+        }
+
+        $roundOff = (float)input('round_off', 0);
+        $totalAmount = round($taxable + $cgstAmt + $sgstAmt + $igstAmt, 2);
+        $grandTotal = round($totalAmount + $roundOff, 2);
+
+        return compact(
+            'items', 'subtotal', 'discount', 'taxable',
+            'cgstRate', 'cgstAmt', 'sgstRate', 'sgstAmt', 'igstRate', 'igstAmt',
+            'roundOff', 'totalAmount', 'grandTotal'
+        );
+    }
+
     // ==================== INVOICES ====================
 
     public function invoices(): void {
@@ -49,74 +91,36 @@ class AccountsController extends Controller {
             if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/accounts/invoices/create'); }
             
             $invNo = generate_invoice_no();
-            $subtotal = 0;
-            $items = $_POST['items'] ?? [];
-            foreach ($items as $item) { 
-                $qty = (float)($item['quantity'] ?? 0);
-                $rate = (float)($item['unit_rate'] ?? 0);
-                $subtotal += ($qty * $rate); 
-            }
-            
-            $discount = (float)(input('discount_amount', 0));
-            $taxable = $subtotal - $discount;
-            
-            // Automatic GST Engine State Comparison
-            $companyState = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_state'") ?: 'Maharashtra';
-            $companyGSTIN = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_gstin'") ?: '27ABCDE1234F1Z1';
-            
             $clientId = (int)input('client_id');
-            $client = $this->db->fetchOne("SELECT state, gstin, address FROM " . $this->db->table("clients") . " WHERE id = ?", [$clientId]);
-            $clientState = $client ? trim($client['state'] ?? '') : '';
-            
-            $isSameState = true;
-            if ($client) {
-                if (!empty($clientState)) {
-                    if (strcasecmp($clientState, $companyState) !== 0) {
-                        $isSameState = false;
-                    }
-                } else {
-                    $clientGST = trim($client['gstin'] ?? '');
-                    if (strlen($clientGST) >= 2 && strlen($companyGSTIN) >= 2) {
-                        if (substr($clientGST, 0, 2) !== substr($companyGSTIN, 0, 2)) {
-                            $isSameState = false;
-                        }
-                    }
-                }
+
+            // Totals honour the GST type / rates / round-off the user saw.
+            $t = $this->computeInvoiceTotals();
+            $items = $t['items'];
+
+            // Validation: a real invoice needs a client and at least one priced line.
+            if (!$clientId) {
+                $this->flash('error', 'Please select a client for the invoice.');
+                $this->redirect('/accounts/invoices/create');
             }
-            
-            $cgstRate = 0; $cgstAmt = 0;
-            $sgstRate = 0; $sgstAmt = 0;
-            $igstRate = 0; $igstAmt = 0;
-            
-            if ($isSameState) {
-                $cgstRate = 9.0;
-                $sgstRate = 9.0;
-                $cgstAmt = round(($taxable * $cgstRate) / 100, 2);
-                $sgstAmt = round(($taxable * $sgstRate) / 100, 2);
-            } else {
-                $igstRate = 18.0;
-                $igstAmt = round(($taxable * $igstRate) / 100, 2);
+            if (empty($items) || $t['grandTotal'] <= 0) {
+                $this->flash('error', 'Add at least one line item with a quantity and rate.');
+                $this->redirect('/accounts/invoices/create');
             }
-            
-            // Auto calculate round off and grand total
-            $grandTotalBeforeRound = $taxable + $cgstAmt + $sgstAmt + $igstAmt;
-            $grandTotal = round($grandTotalBeforeRound);
-            $roundOff = round($grandTotal - $grandTotalBeforeRound, 2);
-            
+
             $this->db->beginTransaction();
             try {
                 $id = $this->db->insert(
-                    "INSERT INTO " . $this->db->table("invoices") . " 
+                    "INSERT INTO " . $this->db->table("invoices") . "
                     (invoice_no, invoice_date, due_date, client_id, po_reference, billing_address,
                      subtotal, discount_amount, taxable_amount, cgst_rate, cgst_amount, sgst_rate, sgst_amount,
                      igst_rate, igst_amount, total_amount, round_off, grand_total, terms_conditions, bank_details, status, created_by, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, NOW())",
                     [$invNo, input('invoice_date'), input('due_date'), $clientId, input('po_reference'),
-                     input('billing_address'), $subtotal, $discount, $taxable,
-                     $cgstRate, $cgstAmt, $sgstRate, $sgstAmt, $igstRate, $igstAmt,
-                     $taxable, $roundOff, $grandTotal, input('terms_conditions'), input('bank_details'), current_user_id()]
+                     input('billing_address'), $t['subtotal'], $t['discount'], $t['taxable'],
+                     $t['cgstRate'], $t['cgstAmt'], $t['sgstRate'], $t['sgstAmt'], $t['igstRate'], $t['igstAmt'],
+                     $t['totalAmount'], $t['roundOff'], $t['grandTotal'], input('terms_conditions'), input('bank_details'), current_user_id()]
                 );
-                
+
                 if ($id && !empty($items)) {
                     foreach ($items as $index => $item) {
                         $qty = (float)($item['quantity'] ?? 0);
@@ -266,11 +270,17 @@ class AccountsController extends Controller {
             $this->requireCan('create');
             if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/accounts/expenses'); }
             
-            $expNo = 'EXP-' . date('Ymd') . '-' . rand(1000, 9999);
             $amount = (float)input('amount');
             $gstAmount = (float)input('gst_amount', 0);
             $totalAmount = $amount + $gstAmount;
-            
+
+            if ($amount <= 0) {
+                $this->flash('error', 'Expense amount must be greater than zero.');
+                $this->redirect('/accounts/expenses');
+            }
+
+            $expNo = 'EXP-' . date('Ymd') . '-' . code_suffix(4);
+
             $this->db->insert(
                 "INSERT INTO " . $this->db->table("expenses") . " 
                 (expense_no, expense_date, category, description, amount, gst_amount, total_amount, vendor, project_id, payment_mode, reference_no, status, created_by, created_at)
@@ -311,16 +321,31 @@ class AccountsController extends Controller {
             $this->requireCan('create');
             if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/accounts/vendor-payments'); }
             
-            $payNo = 'VP-' . date('Ymd') . '-' . rand(1000, 9999);
+            $vendorId = (int)input('vendor_id');
             $amount = (float)input('amount');
             $tdsAmount = (float)input('tds_amount', 0);
             $netAmount = $amount - $tdsAmount;
-            
+
+            if (!$vendorId) {
+                $this->flash('error', 'Please select a vendor for this payment.');
+                $this->redirect('/accounts/vendor-payments');
+            }
+            if ($amount <= 0) {
+                $this->flash('error', 'Payment amount must be greater than zero.');
+                $this->redirect('/accounts/vendor-payments');
+            }
+            if ($tdsAmount < 0 || $tdsAmount > $amount) {
+                $this->flash('error', 'TDS amount cannot be negative or exceed the payment amount.');
+                $this->redirect('/accounts/vendor-payments');
+            }
+
+            $payNo = 'VP-' . date('Ymd') . '-' . code_suffix(4);
+
             $this->db->insert(
-                "INSERT INTO " . $this->db->table("vendor_payments") . " 
+                "INSERT INTO " . $this->db->table("vendor_payments") . "
                 (payment_no, payment_date, vendor_id, po_id, grn_id, invoice_ref, amount, tds_amount, net_amount, payment_mode, transaction_ref, transaction_date, paid_by, remarks, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
-                [$payNo, input('payment_date'), (int)input('vendor_id'), input('po_id') ?: null, input('grn_id') ?: null, input('invoice_ref'), $amount, $tdsAmount, $netAmount, input('payment_mode'), input('transaction_ref'), input('payment_date'), current_user_id(), input('remarks')]
+                [$payNo, input('payment_date') ?: date('Y-m-d'), $vendorId, input('po_id') ?: null, input('grn_id') ?: null, input('invoice_ref'), $amount, $tdsAmount, $netAmount, input('payment_mode'), input('transaction_ref'), input('payment_date') ?: date('Y-m-d'), current_user_id(), input('remarks')]
             );
             
             $this->log('VENDOR_PAYMENT_CREATED', "Vendor payment logged {$payNo}");
@@ -508,72 +533,33 @@ class AccountsController extends Controller {
         if (is_post()) {
             if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/accounts/invoices/edit/' . $id); }
             
-            $subtotal = 0;
-            $items = $_POST['items'] ?? [];
-            foreach ($items as $item) { 
-                $qty = (float)($item['quantity'] ?? 0);
-                $rate = (float)($item['unit_rate'] ?? 0);
-                $subtotal += ($qty * $rate); 
-            }
-            
-            $discount = (float)(input('discount_amount', 0));
-            $taxable = $subtotal - $discount;
-            
-            // Automatic GST Engine State Comparison
-            $companyState = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_state'") ?: 'Maharashtra';
-            $companyGSTIN = $this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'company_gstin'") ?: '27ABCDE1234F1Z1';
-            
             $clientId = (int)input('client_id');
-            $client = $this->db->fetchOne("SELECT state, gstin FROM " . $this->db->table("clients") . " WHERE id = ?", [$clientId]);
-            $clientState = $client ? trim($client['state'] ?? '') : '';
-            
-            $isSameState = true;
-            if ($client) {
-                if (!empty($clientState)) {
-                    if (strcasecmp($clientState, $companyState) !== 0) {
-                        $isSameState = false;
-                    }
-                } else {
-                    $clientGST = trim($client['gstin'] ?? '');
-                    if (strlen($clientGST) >= 2 && strlen($companyGSTIN) >= 2) {
-                        if (substr($clientGST, 0, 2) !== substr($companyGSTIN, 0, 2)) {
-                            $isSameState = false;
-                        }
-                    }
-                }
+
+            // Totals honour the GST type / rates / round-off the user saw.
+            $t = $this->computeInvoiceTotals();
+            $items = $t['items'];
+
+            if (!$clientId) {
+                $this->flash('error', 'Please select a client for the invoice.');
+                $this->redirect('/accounts/invoices/edit/' . $id);
             }
-            
-            $cgstRate = 0; $cgstAmt = 0;
-            $sgstRate = 0; $sgstAmt = 0;
-            $igstRate = 0; $igstAmt = 0;
-            
-            if ($isSameState) {
-                $cgstRate = 9.0;
-                $sgstRate = 9.0;
-                $cgstAmt = round(($taxable * $cgstRate) / 100, 2);
-                $sgstAmt = round(($taxable * $sgstRate) / 100, 2);
-            } else {
-                $igstRate = 18.0;
-                $igstAmt = round(($taxable * $igstRate) / 100, 2);
+            if (empty($items) || $t['grandTotal'] <= 0) {
+                $this->flash('error', 'Add at least one line item with a quantity and rate.');
+                $this->redirect('/accounts/invoices/edit/' . $id);
             }
-            
-            // Auto calculate round off and grand total
-            $grandTotalBeforeRound = $taxable + $cgstAmt + $sgstAmt + $igstAmt;
-            $grandTotal = round($grandTotalBeforeRound);
-            $roundOff = round($grandTotal - $grandTotalBeforeRound, 2);
-            
+
             $this->db->beginTransaction();
             try {
                 $this->db->execute(
-                    "UPDATE " . $this->db->table("invoices") . " 
+                    "UPDATE " . $this->db->table("invoices") . "
                      SET invoice_date = ?, due_date = ?, client_id = ?, po_reference = ?, billing_address = ?,
                          subtotal = ?, discount_amount = ?, taxable_amount = ?, cgst_rate = ?, cgst_amount = ?,
                          sgst_rate = ?, sgst_amount = ?, igst_rate = ?, igst_amount = ?, total_amount = ?,
                          round_off = ?, grand_total = ?, terms_conditions = ?, bank_details = ?, updated_at = NOW()
                      WHERE id = ?",
                     [input('invoice_date'), input('due_date'), $clientId, input('po_reference'), input('billing_address'),
-                     $subtotal, $discount, $taxable, $cgstRate, $cgstAmt, $sgstRate, $sgstAmt, $igstRate, $igstAmt,
-                     $taxable, $roundOff, $grandTotal, input('terms_conditions'), input('bank_details'), $id]
+                     $t['subtotal'], $t['discount'], $t['taxable'], $t['cgstRate'], $t['cgstAmt'], $t['sgstRate'], $t['sgstAmt'], $t['igstRate'], $t['igstAmt'],
+                     $t['totalAmount'], $t['roundOff'], $t['grandTotal'], input('terms_conditions'), input('bank_details'), $id]
                 );
                 
                 // Clear old items
@@ -723,17 +709,25 @@ class AccountsController extends Controller {
             $this->redirect('/accounts/invoices');
         }
 
+        // Once an invoice is issued it becomes part of the audit trail (and may
+        // have payments/ledger entries against it). Only drafts may be deleted;
+        // issued invoices should be cancelled instead.
+        if ($invoice['status'] !== 'draft') {
+            $this->flash('error', 'Only draft invoices can be deleted. Issued invoices must be cancelled to preserve the audit trail.');
+            $this->redirect('/accounts/invoices');
+        }
+
         $this->db->beginTransaction();
         try {
             // Delete dependent line items
             $this->db->execute("DELETE FROM " . $this->db->table("invoice_items") . " WHERE invoice_id = ?", [$id]);
-            
+
             // Delete header row
             $this->db->execute("DELETE FROM " . $this->db->table("invoices") . " WHERE id = ?", [$id]);
-            
+
             $this->db->commit();
-            
-            $this->log('INVOICE_DELETED', "Invoice {$invoice['invoice_no']} deleted");
+
+            $this->log('INVOICE_DELETED', "Draft invoice {$invoice['invoice_no']} deleted");
             $this->flash('success', "Invoice {$invoice['invoice_no']} was successfully deleted.");
         } catch (\Exception $e) {
             $this->db->rollback();
