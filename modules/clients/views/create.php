@@ -165,8 +165,11 @@ $ctype = $client['client_type'] ?? 'direct';
 <script>
 (function () {
     const btn = document.getElementById('gstinLookupBtn');
+    const input = document.getElementById('gstinInput');
     const result = document.getElementById('gstinResult');
     const lookupUrl = <?= json_encode(base_url('clients/gstin-lookup')) ?>;
+    let lastLookedUp = '';
+    let debounce = null;
 
     function setField(id, value, onlyIfEmpty) {
         const el = document.getElementById(id);
@@ -175,12 +178,13 @@ $ctype = $client['client_type'] ?? 'direct';
         el.value = value;
     }
 
-    btn.addEventListener('click', function () {
-        const gstin = (document.getElementById('gstinInput').value || '').trim().toUpperCase();
+    function doLookup() {
+        const gstin = (input.value || '').trim().toUpperCase();
         if (gstin.length !== 15) {
             result.innerHTML = '<span class="text-danger">GSTIN must be 15 characters.</span>';
             return;
         }
+        lastLookedUp = gstin;
         btn.disabled = true;
         result.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm"></span> Verifying…</span>';
 
@@ -222,6 +226,18 @@ $ctype = $client['client_type'] ?? 'direct';
                 btn.disabled = false;
                 result.innerHTML = '<span class="text-danger">Lookup failed. Please try again.</span>';
             });
+    }
+
+    btn.addEventListener('click', doLookup);
+
+    // Auto-fetch as soon as a full 15-char GSTIN is typed/pasted, so the form
+    // fills itself without the user clicking anything.
+    input.addEventListener('input', function () {
+        const gstin = (input.value || '').trim().toUpperCase();
+        clearTimeout(debounce);
+        if (gstin.length === 15 && gstin !== lastLookedUp) {
+            debounce = setTimeout(doLookup, 400);
+        }
     });
 })();
 </script>

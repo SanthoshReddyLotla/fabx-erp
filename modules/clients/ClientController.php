@@ -139,9 +139,12 @@ class ClientController extends Controller {
             $this->json(false, $decoded['error'] ?? 'Invalid GSTIN.', ['decoded' => $decoded]);
         }
 
-        // Optional external taxpayer lookup
+        // Optional external taxpayer lookup. Key/URL come from Settings, with an
+        // environment-variable fallback so it can be configured without DB access.
         $apiKey = (string)($this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'gst_api_key'") ?? '');
         $apiUrl = (string)($this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'gst_api_url'") ?? '');
+        if ($apiKey === '') $apiKey = (string)getenv('FABX_GST_API_KEY');
+        if ($apiUrl === '') $apiUrl = (string)getenv('FABX_GST_API_URL');
         $details = $apiKey ? gstin_api_lookup($gstin, $apiKey, $apiUrl) : null;
 
         $msg = $decoded['valid'] ? 'GSTIN verified.' : ($decoded['error'] ?: 'GSTIN parsed with warnings.');
