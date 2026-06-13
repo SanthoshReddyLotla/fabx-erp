@@ -1594,7 +1594,10 @@ INSERT INTO fabx_settings (setting_key, setting_value, setting_group, descriptio
 ('password_expiry_days', '90', 'security', 'Password expiry period'),
 ('theme', 'light', 'ui', 'Default UI theme'),
 ('iso_certificate', 'ISO 9001:2015', 'qms', 'ISO Certification'),
-('certification_body', 'TUV SUD', 'qms', 'Certification Body');
+('certification_body', 'TUV SUD', 'qms', 'Certification Body'),
+('company_state', 'Maharashtra', 'company', 'Company GST registration state (used for CGST/SGST vs IGST)'),
+('gst_api_key', '', 'integrations', 'API key for GSTIN company lookup (appyflow/mastergst). Leave blank to use offline decode only.'),
+('gst_api_url', 'https://appyflow.in/api/verifyGST?gstNo={GSTIN}&key_secret={KEY}', 'integrations', 'GSTIN lookup URL template with {GSTIN} and {KEY} placeholders');
 
 -- ========================================================
 -- VIEWS FOR REPORTING

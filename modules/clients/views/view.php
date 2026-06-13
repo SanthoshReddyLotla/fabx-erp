@@ -23,7 +23,22 @@ foreach ($invoices as $inv) {
             </span>
         </div>
     </div>
-    <div class="page-actions">
+    <div class="page-actions d-flex gap-2">
+        <a href="<?= base_url('clients/edit/' . $client['id']) ?>" class="btn btn-fx btn-fx-primary"><i class="bi bi-pencil"></i> Edit Profile</a>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-shield"></i> Status</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <?php foreach (['active'=>'Mark Active','inactive'=>'Mark Inactive','blacklisted'=>'Blacklist'] as $sk=>$slbl): ?>
+                    <li>
+                        <form method="POST" action="<?= base_url('clients/status/' . $client['id']) ?>" class="px-0">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="status" value="<?= $sk ?>">
+                            <button type="submit" class="dropdown-item <?= ($client['status'] ?? '') === $sk ? 'active' : '' ?>"><?= $slbl ?></button>
+                        </form>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
         <a href="<?= base_url('clients') ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Directory</a>
     </div>
 </div>
@@ -131,34 +146,53 @@ foreach ($invoices as $inv) {
             
             <!-- 2. Contacts List Tab -->
             <div class="tab-pane fade" id="contactsTabContent" role="tabpanel" aria-labelledby="contacts-tab">
+                <div class="d-flex justify-content-end mb-3">
+                    <button type="button" class="btn btn-sm btn-fx btn-fx-primary" data-bs-toggle="modal" data-bs-target="#addContactModal">
+                        <i class="bi bi-person-plus"></i> Add Contact
+                    </button>
+                </div>
                 <div class="table-responsive-fx">
                     <table class="fx-table align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Contact Name</th>
                                 <th>Designation</th>
+                                <th>Department</th>
                                 <th>Email ID</th>
                                 <th>Phone Number</th>
-                                <th>Alternative Coordinates</th>
+                                <th class="actions text-end">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (!empty($contacts)): ?>
                                 <?php foreach ($contacts as $c): ?>
                                     <tr>
-                                        <td><div class="fw-bold text-light-heading"><?= e($c['contact_name']) ?></div></td>
+                                        <td>
+                                            <div class="fw-bold text-light-heading">
+                                                <?= e($c['name']) ?>
+                                                <?php if (!empty($c['is_primary'])): ?>
+                                                    <span class="badge bg-primary ms-1" style="font-size:0.6rem;">PRIMARY</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td><?= e($c['designation'] ?? '-') ?></td>
+                                        <td><?= e($c['department'] ?? '-') ?></td>
                                         <td><?= e($c['email'] ?? '-') ?></td>
                                         <td><?= e($c['phone'] ?? '-') ?></td>
-                                        <td><?= e($c['mobile'] ?? '-') ?></td>
+                                        <td class="actions text-end">
+                                            <form method="POST" action="<?= base_url('clients/contacts/delete/' . $c['id']) ?>" onsubmit="return confirm('Remove this contact?');" class="d-inline">
+                                                <?= csrf_field() ?>
+                                                <button type="submit" class="btn btn-sm btn-light text-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="5">
+                                    <td colspan="6">
                                         <div class="empty-state py-4 text-center text-muted">
                                             <i class="bi bi-people display-6 mb-2 d-block opacity-25"></i>
-                                            <span>No Primary or Secondary contacts mapped for this client corporate profile.</span>
+                                            <span>No contacts mapped yet. Use "Add Contact" to register key people at this client.</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -195,21 +229,21 @@ foreach ($invoices as $inv) {
                                             <div class="fw-bold text-light-heading"><?= e($proj['project_name']) ?></div>
                                         </td>
                                         <td>
-                                            <span class="text-uppercase text-info small fw-semibold"><?= e(str_replace('_', ' ', $proj['stage'] ?? 'design')) ?></span>
+                                            <span class="text-uppercase text-info small fw-semibold"><?= e(str_replace('_', ' ', $proj['current_stage'] ?? 'planning')) ?></span>
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
                                                 <div class="progress w-100 bg-dark" style="height: 6px;">
-                                                    <div class="progress-bar bg-success" role="progressbar" style="width: <?= (int)($proj['progress'] ?? 0) ?>%"></div>
+                                                    <div class="progress-bar bg-success" role="progressbar" style="width: <?= (int)($proj['progress_percentage'] ?? 0) ?>%"></div>
                                                 </div>
-                                                <span class="small fw-bold font-monospace"><?= (int)($proj['progress'] ?? 0) ?>%</span>
+                                                <span class="small fw-bold font-monospace"><?= (int)($proj['progress_percentage'] ?? 0) ?>%</span>
                                             </div>
                                         </td>
                                         <td class="fw-bold text-light-heading">
-                                            <?= format_currency($proj['planned_value'] ?? 0) ?>
+                                            <?= format_currency($proj['contract_value'] ?? 0) ?>
                                         </td>
                                         <td>
-                                            <div class="small"><?= format_date($proj['end_date'] ?? null) ?></div>
+                                            <div class="small"><?= format_date($proj['target_end_date'] ?? null) ?></div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -351,6 +385,56 @@ foreach ($invoices as $inv) {
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal fade" id="addContactModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-white"><i class="bi bi-person-plus text-primary"></i> Add Client Contact</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="<?= base_url('clients/contacts/add/' . $client['id']) ?>" class="needs-validation" novalidate>
+                <?= csrf_field() ?>
+                <div class="modal-body text-white">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="fx-form-label text-muted small">Contact Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" name="name" required>
+                            <div class="invalid-feedback">Name is required.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fx-form-label text-muted small">Designation</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" name="designation" placeholder="e.g. Procurement Head">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fx-form-label text-muted small">Department</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" name="department" placeholder="e.g. Purchase">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fx-form-label text-muted small">Phone</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" name="phone">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="fx-form-label text-muted small">Email</label>
+                            <input type="email" class="form-control bg-dark border-secondary text-white" name="email">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_primary" value="1" id="isPrimaryContact">
+                                <label class="form-check-label small" for="isPrimaryContact">Primary contact</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-fx btn-fx-primary"><i class="bi bi-check-circle"></i> Add Contact</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

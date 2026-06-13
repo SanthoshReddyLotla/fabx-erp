@@ -109,6 +109,11 @@ $routes = [
     // Clients Module
     'clients' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'index', 'auth' => true],
     'clients/create' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'create', 'auth' => true],
+    'clients/gstin-lookup' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'gstinLookup', 'auth' => true],
+    'clients/edit' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'edit', 'auth' => true],
+    'clients/status' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'updateStatus', 'auth' => true],
+    'clients/contacts/add' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'addContact', 'auth' => true],
+    'clients/contacts/delete' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'deleteContact', 'auth' => true],
     'clients/view' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'show', 'auth' => true],
     'clients/tickets' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'tickets', 'auth' => true],
     'clients/amc' => ['module' => 'clients', 'controller' => 'ClientController', 'action' => 'amc', 'auth' => true],

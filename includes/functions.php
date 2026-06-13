@@ -702,7 +702,146 @@ function is_valid_phone(string $phone): bool {
  * Validate GSTIN
  */
 function is_valid_gstin(string $gstin): bool {
-    return preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/', $gstin) === 1;
+    return preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/', strtoupper(trim($gstin))) === 1;
+}
+
+/**
+ * Map of GST state codes (first two digits of a GSTIN) to state names.
+ */
+function gstin_states(): array {
+    return [
+        '01' => 'Jammu and Kashmir', '02' => 'Himachal Pradesh', '03' => 'Punjab',
+        '04' => 'Chandigarh', '05' => 'Uttarakhand', '06' => 'Haryana', '07' => 'Delhi',
+        '08' => 'Rajasthan', '09' => 'Uttar Pradesh', '10' => 'Bihar', '11' => 'Sikkim',
+        '12' => 'Arunachal Pradesh', '13' => 'Nagaland', '14' => 'Manipur', '15' => 'Mizoram',
+        '16' => 'Tripura', '17' => 'Meghalaya', '18' => 'Assam', '19' => 'West Bengal',
+        '20' => 'Jharkhand', '21' => 'Odisha', '22' => 'Chhattisgarh', '23' => 'Madhya Pradesh',
+        '24' => 'Gujarat', '25' => 'Daman and Diu', '26' => 'Dadra and Nagar Haveli',
+        '27' => 'Maharashtra', '28' => 'Andhra Pradesh (Old)', '29' => 'Karnataka',
+        '30' => 'Goa', '31' => 'Lakshadweep', '32' => 'Kerala', '33' => 'Tamil Nadu',
+        '34' => 'Puducherry', '35' => 'Andaman and Nicobar Islands', '36' => 'Telangana',
+        '37' => 'Andhra Pradesh', '38' => 'Ladakh', '97' => 'Other Territory', '99' => 'Centre Jurisdiction',
+    ];
+}
+
+/**
+ * Validate the GSTIN check digit (base-36 Luhn variant used by the GST system).
+ */
+function validate_gstin_checksum(string $gstin): bool {
+    $gstin = strtoupper(trim($gstin));
+    if (strlen($gstin) !== 15) return false;
+    $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $mod = 36;
+    $factor = 2;
+    $sum = 0;
+    for ($i = 13; $i >= 0; $i--) {
+        $cp = strpos($alphabet, $gstin[$i]);
+        if ($cp === false) return false;
+        $digit = $factor * $cp;
+        $factor = ($factor === 2) ? 1 : 2;
+        $sum += intdiv($digit, $mod) + ($digit % $mod);
+    }
+    $checkCp = ($mod - ($sum % $mod)) % $mod;
+    return $alphabet[$checkCp] === $gstin[14];
+}
+
+/**
+ * Decode everything that can be derived from a GSTIN offline (no API needed):
+ * format/checksum validity, state, embedded PAN, and the entity type that the
+ * PAN's 4th character encodes.
+ */
+function gstin_decode(string $gstin): array {
+    $gstin = strtoupper(trim($gstin));
+    $out = [
+        'valid' => false, 'gstin' => $gstin, 'state_code' => null, 'state' => null,
+        'pan' => null, 'entity_type' => null, 'registration_seq' => null, 'error' => null,
+    ];
+
+    if (!is_valid_gstin($gstin)) {
+        $out['error'] = 'GSTIN must be 15 characters in the format 22AAAAA0000A1Z5.';
+        return $out;
+    }
+    if (!validate_gstin_checksum($gstin)) {
+        $out['error'] = 'GSTIN check digit is invalid - please re-check the number.';
+        // still return the decoded parts below so the user sees what we parsed
+    }
+
+    $stateCode = substr($gstin, 0, 2);
+    $pan = substr($gstin, 2, 10);
+    $entityChar = $pan[3] ?? ''; // 4th char of PAN encodes the holder type
+    $entityTypes = [
+        'P' => 'Individual / Proprietor', 'C' => 'Private/Public Company', 'H' => 'Hindu Undivided Family (HUF)',
+        'F' => 'Partnership Firm / LLP', 'A' => 'Association of Persons (AOP)', 'T' => 'Trust',
+        'B' => 'Body of Individuals (BOI)', 'L' => 'Local Authority', 'J' => 'Artificial Juridical Person',
+        'G' => 'Government',
+    ];
+
+    $out['valid'] = ($out['error'] === null);
+    $out['state_code'] = $stateCode;
+    $out['state'] = gstin_states()[$stateCode] ?? 'Unknown';
+    $out['pan'] = $pan;
+    $out['entity_type'] = $entityTypes[$entityChar] ?? 'Unknown';
+    $out['registration_seq'] = $gstin[12]; // entity registration count within the state
+    return $out;
+}
+
+/**
+ * Look up full taxpayer details for a GSTIN via an external verification API,
+ * if one is configured. Returns null when no API key is set or on failure -
+ * callers fall back to the offline gstin_decode() data.
+ *
+ * Configure in Admin > Settings:
+ *   gst_api_key - your provider key (e.g. appyflow / mastergst)
+ *   gst_api_url - URL template with {GSTIN} and {KEY} placeholders
+ *                 default: https://appyflow.in/api/verifyGST?gstNo={GSTIN}&key_secret={KEY}
+ */
+function gstin_api_lookup(string $gstin, string $apiKey, string $urlTemplate = ''): ?array {
+    if ($apiKey === '') return null;
+    $gstin = strtoupper(trim($gstin));
+    $urlTemplate = $urlTemplate ?: 'https://appyflow.in/api/verifyGST?gstNo={GSTIN}&key_secret={KEY}';
+    $url = str_replace(['{GSTIN}', '{KEY}'], [rawurlencode($gstin), rawurlencode($apiKey)], $urlTemplate);
+
+    $raw = null;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT => 'FabX-ERP',
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => ['timeout' => 8], 'https' => ['timeout' => 8]]);
+        $raw = @file_get_contents($url, false, $ctx);
+    }
+    if (!$raw) return null;
+
+    $data = json_decode($raw, true);
+    if (!is_array($data)) return null;
+
+    // Normalise the common appyflow / mastergst shapes into our field names.
+    $tp = $data['taxpayerInfo'] ?? $data['data'] ?? $data;
+    if (!is_array($tp) || empty($tp)) return null;
+
+    $addr = $tp['pradr']['addr'] ?? [];
+    $line = trim(implode(', ', array_filter([
+        $addr['bno'] ?? null, $addr['bnm'] ?? null, $addr['st'] ?? null,
+        $addr['loc'] ?? null, $addr['landMark'] ?? null,
+    ])));
+
+    return [
+        'legal_name'   => $tp['lgnm'] ?? ($tp['legalName'] ?? null),
+        'trade_name'   => $tp['tradeNam'] ?? ($tp['tradeName'] ?? null),
+        'address'      => $line ?: ($tp['adr'] ?? null),
+        'city'         => $addr['dst'] ?? ($addr['loc'] ?? null),
+        'state'        => $addr['stcd'] ?? null,
+        'pincode'      => $addr['pncd'] ?? null,
+        'status'       => $tp['sts'] ?? null,
+        'registered_on'=> $tp['rgdt'] ?? null,
+        'constitution' => $tp['ctb'] ?? null,
+    ];
 }
 
 /**

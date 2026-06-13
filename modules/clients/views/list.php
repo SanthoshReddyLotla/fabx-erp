@@ -63,6 +63,7 @@
                                 </td>
                                 <td class="actions">
                                     <a href="<?= base_url('clients/view/' . $c['id']) ?>" class="btn btn-sm btn-light" title="View"><i class="bi bi-eye"></i></a>
+                                    <a href="<?= base_url('clients/edit/' . $c['id']) ?>" class="btn btn-sm btn-light" title="Edit"><i class="bi bi-pencil"></i></a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

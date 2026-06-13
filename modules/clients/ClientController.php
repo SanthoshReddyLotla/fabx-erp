@@ -43,29 +43,175 @@ class ClientController extends Controller {
         $this->requireCan('create');
         if (is_post()) {
             if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/clients/create'); }
-            
+
+            $companyName = trim((string)input('company_name'));
+            if ($companyName === '') {
+                $this->flash('error', 'Company name is required.');
+                $this->redirect('/clients/create');
+            }
+            $gstin = strtoupper(trim((string)input('gstin')));
+            if ($gstin !== '' && !is_valid_gstin($gstin)) {
+                $this->flash('error', 'The GSTIN entered is not in a valid format.');
+                $this->redirect('/clients/create');
+            }
+
             $clientCode = generate_code('CL');
             $id = $this->db->insert(
-                "INSERT INTO " . $this->db->table("clients") . " 
+                "INSERT INTO " . $this->db->table("clients") . "
                 (client_code, company_name, contact_person, email, phone, alt_phone, address, city, state,
                  country, pincode, gstin, pan, website, industry, client_type, credit_limit, credit_days,
                  payment_terms, status, created_by, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())",
-                [$clientCode, input('company_name'), input('contact_person'), input('email'), input('phone'),
+                [$clientCode, $companyName, input('contact_person'), input('email'), input('phone'),
                  input('alt_phone'), input('address'), input('city'), input('state'), input('country', 'India'),
-                 input('pincode'), input('gstin'), input('pan'), input('website'), input('industry'),
+                 input('pincode'), $gstin, strtoupper(trim((string)input('pan'))), input('website'), input('industry'),
                  input('client_type', 'direct'), (float)input('credit_limit', 0), (int)input('credit_days', 30),
                  input('payment_terms'), current_user_id()]
             );
-            
-            if ($id) { 
+
+            if ($id) {
                 $this->log('CLIENT_CREATED', "Client {$clientCode} onboarded successfully");
-                $this->flash('success', 'Client created successfully.'); 
-                $this->redirect('/clients'); 
+                $this->flash('success', 'Client created successfully.');
+                $this->redirect('/clients/view/' . $id);
             }
             $this->flash('error', 'Failed to create client.');
         }
-        $this->view('create', ['page_title' => 'Create Client', 'breadcrumb_module' => 'Clients', 'breadcrumb_page' => 'Create']);
+        $this->view('create', [
+            'page_title' => 'Create Client', 'breadcrumb_module' => 'Clients', 'breadcrumb_page' => 'Create',
+            'client' => null, 'form_action' => base_url('clients/create'), 'submit_label' => 'Create Client Profile'
+        ]);
+    }
+
+    public function edit($id = null): void {
+        $this->requireCan('update');
+        $id = (int)($id ?: input('id'));
+        $client = $this->db->fetchOne("SELECT * FROM " . $this->db->table("clients") . " WHERE id = ?", [$id]);
+        if (!$client) { $this->flash('error', 'Client not found.'); $this->redirect('/clients'); }
+
+        if (is_post()) {
+            if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/clients/edit/' . $id); }
+
+            $companyName = trim((string)input('company_name'));
+            if ($companyName === '') {
+                $this->flash('error', 'Company name is required.');
+                $this->redirect('/clients/edit/' . $id);
+            }
+            $gstin = strtoupper(trim((string)input('gstin')));
+            if ($gstin !== '' && !is_valid_gstin($gstin)) {
+                $this->flash('error', 'The GSTIN entered is not in a valid format.');
+                $this->redirect('/clients/edit/' . $id);
+            }
+
+            $this->db->execute(
+                "UPDATE " . $this->db->table("clients") . " SET
+                 company_name = ?, contact_person = ?, email = ?, phone = ?, alt_phone = ?, address = ?,
+                 city = ?, state = ?, country = ?, pincode = ?, gstin = ?, pan = ?, website = ?, industry = ?,
+                 client_type = ?, credit_limit = ?, credit_days = ?, payment_terms = ?, updated_at = NOW()
+                 WHERE id = ?",
+                [$companyName, input('contact_person'), input('email'), input('phone'), input('alt_phone'),
+                 input('address'), input('city'), input('state'), input('country', 'India'), input('pincode'),
+                 $gstin, strtoupper(trim((string)input('pan'))), input('website'), input('industry'),
+                 input('client_type', 'direct'), (float)input('credit_limit', 0), (int)input('credit_days', 30),
+                 input('payment_terms'), $id]
+            );
+            $this->log('CLIENT_UPDATED', "Client {$client['client_code']} updated");
+            $this->flash('success', 'Client profile updated successfully.');
+            $this->redirect('/clients/view/' . $id);
+        }
+
+        $this->view('create', [
+            'page_title' => 'Edit Client', 'breadcrumb_module' => 'Clients', 'breadcrumb_page' => 'Edit ' . $client['company_name'],
+            'client' => $client, 'form_action' => base_url('clients/edit/' . $id), 'submit_label' => 'Save Changes'
+        ]);
+    }
+
+    /**
+     * AJAX: validate/decode a GSTIN and (if an API key is configured) fetch the
+     * registered company details for auto-fill. Always returns the offline
+     * decode (state, PAN, entity type) even with no API configured.
+     */
+    public function gstinLookup(): void {
+        $this->requireCan('read');
+        $gstin = strtoupper(trim((string)input('gstin')));
+
+        $decoded = gstin_decode($gstin);
+        if (!$decoded['state']) {
+            $this->json(false, $decoded['error'] ?? 'Invalid GSTIN.', ['decoded' => $decoded]);
+        }
+
+        // Optional external taxpayer lookup
+        $apiKey = (string)($this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'gst_api_key'") ?? '');
+        $apiUrl = (string)($this->db->fetchValue("SELECT setting_value FROM " . $this->db->table("settings") . " WHERE setting_key = 'gst_api_url'") ?? '');
+        $details = $apiKey ? gstin_api_lookup($gstin, $apiKey, $apiUrl) : null;
+
+        $msg = $decoded['valid'] ? 'GSTIN verified.' : ($decoded['error'] ?: 'GSTIN parsed with warnings.');
+        if ($details && !empty($details['legal_name'])) {
+            $msg = 'Company details fetched from GST registry.';
+        } elseif (!$apiKey) {
+            $msg .= ' (Configure a GST API key in Settings to auto-fetch the company name & address.)';
+        }
+
+        $this->json(true, $msg, ['decoded' => $decoded, 'details' => $details]);
+    }
+
+    public function addContact($id = null): void {
+        $this->requireCan('update');
+        $id = (int)($id ?: input('client_id'));
+        if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/clients/view/' . $id); }
+
+        $client = $this->db->fetchOne("SELECT id FROM " . $this->db->table("clients") . " WHERE id = ?", [$id]);
+        if (!$client) { $this->flash('error', 'Client not found.'); $this->redirect('/clients'); }
+
+        $name = trim((string)input('name'));
+        if ($name === '') {
+            $this->flash('error', 'Contact name is required.');
+            $this->redirect('/clients/view/' . $id);
+        }
+
+        $isPrimary = input('is_primary') ? 1 : 0;
+        if ($isPrimary) {
+            // Only one primary contact per client
+            $this->db->execute("UPDATE " . $this->db->table("client_contacts") . " SET is_primary = 0 WHERE client_id = ?", [$id]);
+        }
+        $this->db->insert(
+            "INSERT INTO " . $this->db->table("client_contacts") . " (client_id, name, designation, department, email, phone, is_primary)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [$id, $name, input('designation'), input('department'), input('email'), input('phone'), $isPrimary]
+        );
+        $this->log('CLIENT_CONTACT_ADDED', "Contact {$name} added to client #{$id}");
+        $this->flash('success', 'Contact added successfully.');
+        $this->redirect('/clients/view/' . $id);
+    }
+
+    public function deleteContact($contactId = null): void {
+        $this->requireCan('update');
+        $contactId = (int)($contactId ?: input('contact_id'));
+        $contact = $this->db->fetchOne("SELECT * FROM " . $this->db->table("client_contacts") . " WHERE id = ?", [$contactId]);
+        if (!$contact) { $this->flash('error', 'Contact not found.'); $this->redirect('/clients'); }
+
+        $this->db->execute("DELETE FROM " . $this->db->table("client_contacts") . " WHERE id = ?", [$contactId]);
+        $this->log('CLIENT_CONTACT_DELETED', "Contact #{$contactId} removed");
+        $this->flash('success', 'Contact removed.');
+        $this->redirect('/clients/view/' . $contact['client_id']);
+    }
+
+    public function updateStatus($id = null): void {
+        $this->requireCan('update');
+        $id = (int)($id ?: input('id'));
+        if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/clients/view/' . $id); }
+
+        $status = input('status');
+        if (!in_array($status, ['active', 'inactive', 'blacklisted'], true)) {
+            $this->flash('error', 'Invalid status.');
+            $this->redirect('/clients/view/' . $id);
+        }
+        $client = $this->db->fetchOne("SELECT client_code FROM " . $this->db->table("clients") . " WHERE id = ?", [$id]);
+        if (!$client) { $this->flash('error', 'Client not found.'); $this->redirect('/clients'); }
+
+        $this->db->execute("UPDATE " . $this->db->table("clients") . " SET status = ?, updated_at = NOW() WHERE id = ?", [$status, $id]);
+        $this->log('CLIENT_STATUS_CHANGED', "Client {$client['client_code']} set to {$status}");
+        $this->flash('success', "Client status updated to " . ucfirst($status) . ".");
+        $this->redirect('/clients/view/' . $id);
     }
 
     public function show($id = null): void {
