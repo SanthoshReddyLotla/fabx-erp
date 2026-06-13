@@ -825,18 +825,32 @@ function gstin_api_lookup(string $gstin, string $apiKey, string $urlTemplate = '
     $tp = $data['taxpayerInfo'] ?? $data['data'] ?? $data;
     if (!is_array($tp) || empty($tp)) return null;
 
-    $addr = $tp['pradr']['addr'] ?? [];
-    $line = trim(implode(', ', array_filter([
-        $addr['bno'] ?? null, $addr['bnm'] ?? null, $addr['st'] ?? null,
-        $addr['loc'] ?? null, $addr['landMark'] ?? null,
-    ])));
+    // Principal place of business: GST returns a pre-formatted full address
+    // string in pradr.adr; fall back to assembling it from the parts.
+    $pradr = $tp['pradr'] ?? [];
+    $addr  = $pradr['addr'] ?? [];
+    $fullAddress = trim((string)($pradr['adr'] ?? ''));
+    if ($fullAddress === '') {
+        $fullAddress = trim(implode(', ', array_filter([
+            $addr['flno'] ?? null, $addr['bno'] ?? null, $addr['bnm'] ?? null,
+            $addr['st'] ?? null, $addr['loc'] ?? null, $addr['landMark'] ?? null,
+            $addr['city'] ?? null,
+        ])), ', ');
+    }
+
+    // stcd is the numeric state code (e.g. "27"); convert it to the state name.
+    $stcd = (string)($addr['stcd'] ?? '');
+    $stateName = $stcd;
+    if (preg_match('/^\d{1,2}$/', $stcd)) {
+        $stateName = gstin_states()[str_pad($stcd, 2, '0', STR_PAD_LEFT)] ?? $stcd;
+    }
 
     return [
         'legal_name'   => $tp['lgnm'] ?? ($tp['legalName'] ?? null),
         'trade_name'   => $tp['tradeNam'] ?? ($tp['tradeName'] ?? null),
-        'address'      => $line ?: ($tp['adr'] ?? null),
-        'city'         => $addr['dst'] ?? ($addr['loc'] ?? null),
-        'state'        => $addr['stcd'] ?? null,
+        'address'      => $fullAddress ?: null,
+        'city'         => $addr['dst'] ?? ($addr['city'] ?? ($addr['loc'] ?? null)),
+        'state'        => $stateName ?: null,
         'pincode'      => $addr['pncd'] ?? null,
         'status'       => $tp['sts'] ?? null,
         'registered_on'=> $tp['rgdt'] ?? null,
