@@ -147,6 +147,7 @@ $routes = [
     'accounts/expenses' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'expenses', 'auth' => true],
     'accounts/vendor-payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'vendorPayments', 'auth' => true],
     'accounts/ledger' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'ledger', 'auth' => true],
+    'accounts/gst' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'gst', 'auth' => true],
 
     // HR Module
     'hr/employees' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'employees', 'auth' => true],

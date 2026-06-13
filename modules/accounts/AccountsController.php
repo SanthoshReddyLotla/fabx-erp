@@ -419,6 +419,94 @@ class AccountsController extends Controller {
         ]);
     }
 
+    // ==================== GST SUMMARY (MONTHLY FILING) ====================
+
+    /**
+     * Monthly GST position for return filing: output tax collected on sales
+     * invoices vs input tax (ITC) on purchase expenses, and the net payable.
+     */
+    public function gst(): void {
+        $this->requireCan('read');
+
+        $month = (string)input('month');
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $month = date('Y-m');
+        }
+
+        // OUTPUT TAX — issued tax invoices for the month (drafts/cancelled and
+        // proformas excluded; a proforma is not a tax invoice).
+        $out = $this->db->fetchOne(
+            "SELECT COUNT(*) AS cnt,
+                    COALESCE(SUM(taxable_amount),0) AS taxable,
+                    COALESCE(SUM(cgst_amount),0)   AS cgst,
+                    COALESCE(SUM(sgst_amount),0)   AS sgst,
+                    COALESCE(SUM(igst_amount),0)   AS igst,
+                    COALESCE(SUM(grand_total),0)   AS total
+             FROM " . $this->db->table("invoices") . "
+             WHERE status NOT IN ('draft','cancelled') AND invoice_type <> 'proforma'
+               AND DATE_FORMAT(invoice_date, '%Y-%m') = ?",
+            [$month]
+        );
+
+        // INPUT TAX (ITC) — GST paid on expenses recorded in the month.
+        $in = $this->db->fetchOne(
+            "SELECT COUNT(*) AS cnt,
+                    COALESCE(SUM(amount),0)     AS base,
+                    COALESCE(SUM(gst_amount),0) AS gst
+             FROM " . $this->db->table("expenses") . "
+             WHERE DATE_FORMAT(expense_date, '%Y-%m') = ?",
+            [$month]
+        );
+
+        $outputGst = round((float)$out['cgst'] + (float)$out['sgst'] + (float)$out['igst'], 2);
+        $inputGst  = round((float)$in['gst'], 2);
+        $netPayable = round($outputGst - $inputGst, 2);
+
+        // Sales register (GSTR-1 cross-check data)
+        $sales = $this->db->fetchAll(
+            "SELECT i.invoice_no, i.invoice_date, i.taxable_amount, i.cgst_amount, i.sgst_amount,
+                    i.igst_amount, i.grand_total, c.company_name AS client_name, c.gstin AS client_gstin
+             FROM " . $this->db->table("invoices") . " i
+             LEFT JOIN " . $this->db->table("clients") . " c ON i.client_id = c.id
+             WHERE i.status NOT IN ('draft','cancelled') AND i.invoice_type <> 'proforma'
+               AND DATE_FORMAT(i.invoice_date, '%Y-%m') = ?
+             ORDER BY i.invoice_date ASC, i.invoice_no ASC",
+            [$month]
+        );
+
+        // Expense / ITC register
+        $expenses = $this->db->fetchAll(
+            "SELECT expense_no, expense_date, category, vendor, amount, gst_amount, total_amount
+             FROM " . $this->db->table("expenses") . "
+             WHERE DATE_FORMAT(expense_date, '%Y-%m') = ?
+             ORDER BY expense_date ASC",
+            [$month]
+        );
+
+        // CSV export of the sales register for the month
+        if (input('export') === 'csv') {
+            $rows = [];
+            foreach ($sales as $s) {
+                $rows[] = [
+                    $s['invoice_no'], format_date($s['invoice_date']), $s['client_name'] ?? '',
+                    $s['client_gstin'] ?? '', number_format((float)$s['taxable_amount'], 2, '.', ''),
+                    number_format((float)$s['cgst_amount'], 2, '.', ''), number_format((float)$s['sgst_amount'], 2, '.', ''),
+                    number_format((float)$s['igst_amount'], 2, '.', ''), number_format((float)$s['grand_total'], 2, '.', ''),
+                ];
+            }
+            export_csv($rows, ['Invoice No', 'Date', 'Client', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'], "GST-Sales-Register-{$month}.csv");
+        }
+
+        $this->view('gst', [
+            'page_title' => 'GST Summary', 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'GST Summary',
+            'month' => $month,
+            'period_label' => date('F Y', strtotime($month . '-01')),
+            'out' => $out, 'in' => $in,
+            'output_gst' => $outputGst, 'input_gst' => $inputGst, 'net_payable' => $netPayable,
+            'sales' => $sales, 'expenses' => $expenses,
+        ]);
+    }
+
     public function viewInvoice($id = null): void {
         $this->requireCan('read');
         if (!$id) {

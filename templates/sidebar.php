@@ -93,6 +93,7 @@ $menuItems = [
             ['label' => 'Expenses', 'url' => '/accounts/expenses', 'icon' => 'wallet'],
             ['label' => 'Vendor Payments', 'url' => '/accounts/vendor-payments', 'icon' => 'cash'],
             ['label' => 'Ledger', 'url' => '/accounts/ledger', 'icon' => 'book'],
+            ['label' => 'GST Summary', 'url' => '/accounts/gst', 'icon' => 'percent'],
         ]
     ],
     [
