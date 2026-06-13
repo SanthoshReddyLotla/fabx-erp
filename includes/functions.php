@@ -161,6 +161,15 @@ function generate_wo_no(): string {
 }
 
 /**
+ * Generate delivery challan number
+ */
+function generate_dc_no(): string {
+    $year = date('Y');
+    $month = date('m');
+    return 'DC-' . $year . $month . '-' . code_suffix(4);
+}
+
+/**
  * Sanitize input string
  */
 function sanitize(string $input): string {

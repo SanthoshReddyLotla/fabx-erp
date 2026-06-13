@@ -1469,6 +1469,46 @@ CREATE TABLE fabx_vendor_payments (
     INDEX idx_payment_no (payment_no)
 ) ENGINE=InnoDB;
 
+-- Delivery Challans (goods dispatch, incl. job work / approval movements)
+CREATE TABLE fabx_delivery_challans (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dc_no VARCHAR(50) NOT NULL UNIQUE,
+    dc_date DATE NOT NULL,
+    client_id INT NOT NULL,
+    project_id INT,
+    invoice_id INT,
+    reason ENUM('supply','job_work','sample','approval','return','others') DEFAULT 'supply',
+    ship_to_address TEXT,
+    vehicle_no VARCHAR(50),
+    transport_mode VARCHAR(50),
+    transporter VARCHAR(255),
+    eway_bill_no VARCHAR(50),
+    remarks TEXT,
+    status ENUM('draft','dispatched','delivered','cancelled') DEFAULT 'dispatched',
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES fabx_clients(id),
+    FOREIGN KEY (project_id) REFERENCES fabx_projects(id),
+    FOREIGN KEY (invoice_id) REFERENCES fabx_invoices(id),
+    FOREIGN KEY (created_by) REFERENCES fabx_users(id),
+    INDEX idx_dc_no (dc_no),
+    INDEX idx_dc_date (dc_date)
+) ENGINE=InnoDB;
+
+CREATE TABLE fabx_dc_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dc_id INT NOT NULL,
+    sr_no INT NOT NULL,
+    description TEXT NOT NULL,
+    hsn_code VARCHAR(20),
+    quantity DECIMAL(12,3) NOT NULL DEFAULT 0,
+    uom VARCHAR(50) DEFAULT 'Nos',
+    value DECIMAL(15,2) DEFAULT 0,
+    remarks VARCHAR(255),
+    FOREIGN KEY (dc_id) REFERENCES fabx_delivery_challans(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- ========================================================
 -- 10. FILE MANAGEMENT TABLES
 -- ========================================================

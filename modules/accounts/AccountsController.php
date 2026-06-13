@@ -419,6 +419,115 @@ class AccountsController extends Controller {
         ]);
     }
 
+    // ==================== DELIVERY CHALLANS ====================
+
+    public function deliveryChallans(): void {
+        $this->requireCan('read');
+        $page = (int)($_GET['page'] ?? 1);
+
+        $challans = $this->db->fetchAll(
+            "SELECT dc.*, c.company_name AS client_name, p.project_code
+             FROM " . $this->db->table("delivery_challans") . " dc
+             LEFT JOIN " . $this->db->table("clients") . " c ON dc.client_id = c.id
+             LEFT JOIN " . $this->db->table("projects") . " p ON dc.project_id = p.id
+             ORDER BY dc.created_at DESC LIMIT ? OFFSET ?",
+            [DEFAULT_PER_PAGE, ($page - 1) * DEFAULT_PER_PAGE]
+        );
+        $total = (int)$this->db->fetchValue("SELECT COUNT(*) FROM " . $this->db->table("delivery_challans"));
+
+        $this->view('dc/list', [
+            'page_title' => 'Delivery Challans', 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Delivery Challans',
+            'challans' => $challans, 'pagination' => paginate($total, $page)
+        ]);
+    }
+
+    public function createChallan(): void {
+        $this->requireCan('create');
+
+        if (is_post()) {
+            if (!validate_csrf()) { $this->flash('error', 'Invalid token'); $this->redirect('/accounts/delivery-challans/create'); }
+
+            $clientId = (int)input('client_id');
+            $items = $_POST['items'] ?? [];
+            $items = array_values(array_filter($items, fn($it) => trim((string)($it['description'] ?? '')) !== ''));
+
+            if (!$clientId) {
+                $this->flash('error', 'Please select a client/consignee.');
+                $this->redirect('/accounts/delivery-challans/create');
+            }
+            if (empty($items)) {
+                $this->flash('error', 'Add at least one item to dispatch.');
+                $this->redirect('/accounts/delivery-challans/create');
+            }
+
+            $dcNo = generate_dc_no();
+            $this->db->beginTransaction();
+            try {
+                $id = $this->db->insert(
+                    "INSERT INTO " . $this->db->table("delivery_challans") . "
+                    (dc_no, dc_date, client_id, project_id, invoice_id, reason, ship_to_address, vehicle_no,
+                     transport_mode, transporter, eway_bill_no, remarks, status, created_by, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'dispatched', ?, NOW())",
+                    [$dcNo, input('dc_date') ?: date('Y-m-d'), $clientId, input('project_id') ?: null,
+                     input('invoice_id') ?: null, input('reason', 'supply'), input('ship_to_address'),
+                     input('vehicle_no'), input('transport_mode'), input('transporter'),
+                     input('eway_bill_no'), input('remarks'), current_user_id()]
+                );
+
+                foreach ($items as $index => $item) {
+                    $this->db->execute(
+                        "INSERT INTO " . $this->db->table("dc_items") . "
+                        (dc_id, sr_no, description, hsn_code, quantity, uom, value, remarks)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        [$id, $index + 1, $item['description'], $item['hsn_code'] ?? '',
+                         (float)($item['quantity'] ?? 0), $item['uom'] ?? 'Nos',
+                         (float)($item['value'] ?? 0), $item['remarks'] ?? '']
+                    );
+                }
+
+                $this->db->commit();
+                $this->log('DC_CREATED', "Delivery Challan {$dcNo} created");
+                $this->flash('success', "Delivery Challan {$dcNo} created successfully.");
+                $this->redirect('/accounts/delivery-challans/print/' . $id);
+            } catch (\Exception $e) {
+                $this->db->rollback();
+                $this->flash('error', 'Failed to create delivery challan: ' . $e->getMessage());
+                $this->redirect('/accounts/delivery-challans/create');
+            }
+        }
+
+        $clients = $this->db->fetchAll("SELECT id, company_name, address FROM " . $this->db->table("clients") . " WHERE status = 'active' ORDER BY company_name");
+        $projects = $this->db->fetchAll("SELECT id, project_code, project_name FROM " . $this->db->table("projects") . " WHERE status = 'active'");
+        $this->view('dc/create', [
+            'page_title' => 'Create Delivery Challan', 'breadcrumb_module' => 'Accounts', 'breadcrumb_page' => 'Create DC',
+            'clients' => $clients, 'projects' => $projects, 'dc_no' => generate_dc_no()
+        ]);
+    }
+
+    public function printChallan($id = null): void {
+        $this->requireCan('read');
+        $id = (int)($id ?: input('id'));
+
+        $dc = $this->db->fetchOne(
+            "SELECT dc.*, c.company_name AS client_name, c.address AS client_address, c.gstin AS client_gstin,
+                    p.project_name, p.project_code
+             FROM " . $this->db->table("delivery_challans") . " dc
+             LEFT JOIN " . $this->db->table("clients") . " c ON dc.client_id = c.id
+             LEFT JOIN " . $this->db->table("projects") . " p ON dc.project_id = p.id
+             WHERE dc.id = ?",
+            [$id]
+        );
+        if (!$dc) {
+            $this->flash('error', 'Delivery challan not found.');
+            $this->redirect('/accounts/delivery-challans');
+        }
+        $items = $this->db->fetchAll("SELECT * FROM " . $this->db->table("dc_items") . " WHERE dc_id = ? ORDER BY sr_no ASC", [$id]);
+
+        $this->printView('dc/print', 'Delivery Challan ' . $dc['dc_no'], [
+            'dc' => $dc, 'items' => $items
+        ]);
+    }
+
     // ==================== GST SUMMARY (MONTHLY FILING) ====================
 
     /**

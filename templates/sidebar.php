@@ -92,6 +92,7 @@ $menuItems = [
             ['label' => 'Payments', 'url' => '/accounts/payments', 'icon' => 'credit-card'],
             ['label' => 'Expenses', 'url' => '/accounts/expenses', 'icon' => 'wallet'],
             ['label' => 'Vendor Payments', 'url' => '/accounts/vendor-payments', 'icon' => 'cash'],
+            ['label' => 'Delivery Challans', 'url' => '/accounts/delivery-challans', 'icon' => 'truck'],
             ['label' => 'Ledger', 'url' => '/accounts/ledger', 'icon' => 'book'],
             ['label' => 'GST Summary', 'url' => '/accounts/gst', 'icon' => 'percent'],
         ]

@@ -148,6 +148,9 @@ $routes = [
     'accounts/vendor-payments' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'vendorPayments', 'auth' => true],
     'accounts/ledger' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'ledger', 'auth' => true],
     'accounts/gst' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'gst', 'auth' => true],
+    'accounts/delivery-challans/create' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'createChallan', 'auth' => true],
+    'accounts/delivery-challans/print' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'printChallan', 'auth' => true],
+    'accounts/delivery-challans' => ['module' => 'accounts', 'controller' => 'AccountsController', 'action' => 'deliveryChallans', 'auth' => true],
 
     // HR Module
     'hr/employees' => ['module' => 'hr', 'controller' => 'HRController', 'action' => 'employees', 'auth' => true],
