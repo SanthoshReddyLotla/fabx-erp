@@ -111,8 +111,8 @@ INSERT INTO fabx_quotations (quotation_no, quotation_date, client_id, subject, d
 
 -- Sample Purchase Requisitions
 INSERT INTO fabx_purchase_requisitions (pr_no, pr_date, department_id, required_by_date, justification, requested_by, status) VALUES
-(generate_code('PR'), '2024-03-18', 4, '2024-04-05', 'Required for PRJ-2024-004 Heat Exchanger fabrication. Material as per project BOQ.', 1, 'submitted'),
-(generate_code('PR'), '2024-03-20', 4, '2024-04-10', 'Required for PRJ-2024-001 tank shell courses. Urgent - production schedule at risk.', 1, 'approved');
+('PR-20240318-A1B2', '2024-03-18', 4, '2024-04-05', 'Required for PRJ-2024-004 Heat Exchanger fabrication. Material as per project BOQ.', 1, 'submitted'),
+('PR-20240320-C3D4', '2024-03-20', 4, '2024-04-10', 'Required for PRJ-2024-001 tank shell courses. Urgent - production schedule at risk.', 1, 'approved');
 
 -- Insert PR Items
 INSERT INTO fabx_pr_items (pr_id, item_id, description, quantity, uom, required_by_date, purpose) VALUES
